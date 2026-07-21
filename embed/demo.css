@@ -48,10 +48,37 @@ a {
     font-weight: 700;
 }
 
-.status {
-    min-height: 1.5em;
+.world-toolbar {
+    min-height: 2.5em;
     margin: 14px 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.status {
     font-size: .875rem;
+}
+
+.world-controls {
+    display: flex;
+    gap: 6px;
+}
+
+.world-controls button {
+    padding: 6px 12px;
+    border: 1px solid #9aac90;
+    border-radius: 999px;
+    background: transparent;
+    color: #426630;
+    cursor: pointer;
+}
+
+.world-controls button.active {
+    border-color: #426630;
+    background: #426630;
+    color: white;
 }
 
 koi-world,
@@ -69,5 +96,9 @@ koi-system {
     nav {
         margin-top: 12px;
     }
-}
 
+    .world-toolbar {
+        align-items: start;
+        flex-direction: column;
+    }
+}

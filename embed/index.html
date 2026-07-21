@@ -15,15 +15,25 @@
         </div>
         <nav><a href="system.html">View the full system →</a></nav>
     </header>
-    <p class="status" id="status">Loading the world…</p>
-    <koi-world storage-key="world-demo" pond="0" title="Standalone Koi world"></koi-world>
+    <div class="world-toolbar">
+        <p class="status" id="status">Loading the world…</p>
+        <div class="world-controls" role="group" aria-label="Choose a host-managed world">
+            <button type="button" data-save-key="world-demo:garden" class="active">Garden</button>
+            <button type="button" data-save-key="world-demo:courtyard">Courtyard</button>
+        </div>
+    </div>
+    <koi-world save-key="world-demo:garden" title="Standalone Koi world"></koi-world>
 </main>
 <script type="module">
     import "./koi-farm.js";
 
     const world = document.querySelector("koi-world");
     const status = document.getElementById("status");
+    const worldButtons = document.querySelectorAll("[data-save-key]");
     let live = false;
+
+    for (const button of worldButtons)
+        button.addEventListener("click", () => world.load(button.dataset.saveKey));
 
     world.addEventListener("koi-world:ready", event => {
         if (!live)
@@ -32,7 +42,10 @@
 
     world.addEventListener("koi-world:session", event => {
         live = true;
-        status.textContent = `Pond ${event.detail.pond + 1} is live`;
+        status.textContent = `World “${event.detail.saveKey}” is live (${event.detail.resumed ? "resumed" : "new"})`;
+
+        for (const button of worldButtons)
+            button.classList.toggle("active", button.dataset.saveKey === event.detail.saveKey);
     });
 </script>
 </body>

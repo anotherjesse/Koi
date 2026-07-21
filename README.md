@@ -39,8 +39,7 @@ Serve this package's browser assets from a public path, import the component mod
 
 <koi-world
     src="/koi/index.html"
-    pond="0"
-    storage-key="my-site"
+    save-key="homepage-pond"
     title="My koi pond">
 </koi-world>
 ```
@@ -51,15 +50,23 @@ Add the complete system separately when a project needs it:
 <koi-system src="/koi/index.html" storage-key="my-site"></koi-system>
 ```
 
-Each component fills its available width with a 3:2 aspect ratio. These optional attributes configure an instance:
+Each component fills its available width with a 3:2 aspect ratio. `<koi-world>` accepts an opaque `save-key`, so applications can create any number of independently saved worlds without exposing the system's slot model:
+
+```html
+<koi-world save-key="garden"></koi-world>
+<koi-world save-key="courtyard"></koi-world>
+```
+
+The exact key is used for save and load in browser storage. If omitted, it defaults to `koi-world`. These optional attributes configure an instance:
 
 - `lang`: a supported locale such as `en-metric`, `ja`, or `nl`.
-- `pond`: open pond `0`, `1`, or `2`; `<koi-world>` defaults to `0`.
-- `storage-key`: namespace save data when a site hosts multiple instances.
+- `save-key`: the arbitrary save name for `<koi-world>`.
+- `pond`: open system slot `0`, `1`, or `2`; only used by `<koi-system>`.
+- `storage-key`: namespace all system save slots; only used by `<koi-system>`.
 - `social`: show the Discord link in `<koi-system>`; it is hidden by default and is always omitted from `<koi-world>`.
 - `loading`: set the iframe loading mode to `eager` or `lazy`.
 
-The components emit prefixed lifecycle events: `koi-world:load`, `koi-world:ready`, and `koi-world:session` for the world; `koi-system:*` for the complete system. Both expose `openPond(index)` and `reload()`. The system also exposes `openMenu()`.
+The components emit prefixed lifecycle events: `koi-world:load`, `koi-world:ready`, `koi-world:session`, and `koi-world:saved` for the world; `koi-system:*` for the complete system. A world exposes `saveKey`, `load(saveKey)`, `save()`, and `reload()`. Switching keys saves the current world before loading the next one. The system exposes `openPond(index)`, `openMenu()`, and `reload()`.
 
 When consuming the package from JavaScript, importing `koifarm` registers all three tags and exports `KoiWorldElement`, `KoiSystemElement`, `KoiFarmElement`, and their registration helpers.
 

@@ -29,7 +29,7 @@ const Loader = function(
     this.onFinish = null;
     this.onNewGame = null;
     this.onContinue = null;
-    this.automaticSlot = null;
+    this.automaticSave = null;
     this.menu = null;
     this.fullscreen = new LoaderFullscreen(wrapper);
     this.loadFullscreen = loadFullscreen;
@@ -158,11 +158,11 @@ Loader.prototype.complete = function() {
         this.hide();
     };
 
-    if (this.automaticSlot !== null) {
-        if (this.resumables[this.automaticSlot])
-            onContinue(this.automaticSlot);
+    if (this.automaticSave !== null) {
+        if (this.automaticSave.resumable)
+            onContinue(this.automaticSave.key);
         else
-            onNewGame(this.automaticSlot);
+            onNewGame(this.automaticSave.key);
 
         return;
     }
@@ -240,11 +240,15 @@ Loader.prototype.setContinueCallback = function(onContinue) {
 };
 
 /**
- * Automatically start a pond as soon as loading is complete
- * @param {Number} slot The pond slot index
+ * Automatically start a save as soon as loading is complete
+ * @param {String} key The opaque save key
+ * @param {Boolean} resumable Whether the save already exists
  */
-Loader.prototype.setAutomaticSlot = function(slot) {
-    this.automaticSlot = slot;
+Loader.prototype.setAutomaticSave = function(key, resumable) {
+    this.automaticSave = {
+        key: key,
+        resumable: resumable
+    };
 };
 
 /**

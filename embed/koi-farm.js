@@ -1,4 +1,5 @@
 const HTMLElementBase = globalThis.HTMLElement || class {};
+const DEFAULT_WORLD_SAVE_KEY = "koi-world";
 
 const getPondIndex = (value, fallback = 0) => {
     if (value === null || value === "")
@@ -18,13 +19,15 @@ const getPondIndex = (value, fallback = 0) => {
  */
 export class KoiFrameElement extends HTMLElementBase {
     static get observedAttributes() {
-        return ["src", "lang", "pond", "storage-key", "social", "loading", "title"];
+        return ["src", "lang", "loading", "title"];
     }
 
     constructor() {
         super();
 
         this.frame = null;
+        this.saveRequest = 0;
+        this.saveRequests = new Map();
         this.onMessage = this.onMessage.bind(this);
     }
 
@@ -36,6 +39,13 @@ export class KoiFrameElement extends HTMLElementBase {
 
     disconnectedCallback() {
         window.removeEventListener("message", this.onMessage);
+
+        for (const request of this.saveRequests.values()) {
+            clearTimeout(request.timeout);
+            request.resolve(false);
+        }
+
+        this.saveRequests.clear();
     }
 
     attributeChangedCallback(name, previous, next) {
@@ -77,15 +87,11 @@ export class KoiFrameElement extends HTMLElementBase {
             new URL(configuredSource, document.baseURI) :
             new URL("../index.html", import.meta.url);
         const language = this.getAttribute("lang");
-        const storageKey = this.getAttribute("storage-key");
 
         source.searchParams.set("embed", "1");
 
         if (language)
             source.searchParams.set("lang", language);
-
-        if (storageKey)
-            source.searchParams.set("storage", storageKey);
 
         this.configureSource(source);
 
@@ -129,22 +135,6 @@ export class KoiFrameElement extends HTMLElementBase {
     }
 
     /**
-     * Start or resume a pond. A missing save automatically starts a new pond.
-     * @param {Number} pond Pond index from 0 through 2
-     */
-    openPond(pond) {
-        const index = getPondIndex(pond, -1);
-
-        if (index === -1)
-            throw new RangeError("pond must be an integer from 0 through 2");
-
-        if (this.getAttribute("pond") === index.toString())
-            this.reload();
-        else
-            this.setAttribute("pond", index.toString());
-    }
-
-    /**
      * Reload the current runtime URL.
      */
     reload() {
@@ -152,6 +142,34 @@ export class KoiFrameElement extends HTMLElementBase {
             this.frame.src = this.makeSource();
         else if (this.isConnected)
             this.render();
+    }
+
+    /**
+     * Ask the current runtime to persist its active session.
+     * @returns {Promise<Boolean>} Whether the runtime acknowledged the save
+     */
+    save() {
+        if (!this.gameWindow)
+            return Promise.resolve(false);
+
+        const requestId = `${Date.now()}-${++this.saveRequest}`;
+
+        return new Promise(resolve => {
+            const timeout = setTimeout(() => {
+                this.saveRequests.delete(requestId);
+                resolve(false);
+            }, 1000);
+
+            this.saveRequests.set(requestId, {
+                resolve: resolve,
+                timeout: timeout
+            });
+            this.gameWindow.postMessage({
+                source: "koi-component",
+                type: "koi-farm:save",
+                requestId: requestId
+            }, "*");
+        });
     }
 
     /**
@@ -167,6 +185,14 @@ export class KoiFrameElement extends HTMLElementBase {
         if (!message || message.source !== "koi-farm" || typeof message.type !== "string")
             return;
 
+        if (message.type === "koi-farm:saved" && this.saveRequests.has(message.requestId)) {
+            const request = this.saveRequests.get(message.requestId);
+
+            clearTimeout(request.timeout);
+            this.saveRequests.delete(message.requestId);
+            request.resolve(true);
+        }
+
         this.dispatchLifecycle(message.type.split(":").pop(), message);
     }
 }
@@ -177,6 +203,10 @@ export class KoiFrameElement extends HTMLElementBase {
  * Listen for `koi-world:load`, `koi-world:ready`, and `koi-world:session`.
  */
 export class KoiWorldElement extends KoiFrameElement {
+    static get observedAttributes() {
+        return [...super.observedAttributes, "save-key"];
+    }
+
     get eventPrefix() {
         return "koi-world";
     }
@@ -185,11 +215,50 @@ export class KoiWorldElement extends KoiFrameElement {
         return "Koi world";
     }
 
+    /**
+     * The opaque browser storage key used for this world's serialized state.
+     * @returns {String}
+     */
+    get saveKey() {
+        return this.getAttribute("save-key") || DEFAULT_WORLD_SAVE_KEY;
+    }
+
+    set saveKey(saveKey) {
+        if (typeof saveKey !== "string" || saveKey.trim() === "")
+            throw new TypeError("saveKey must be a non-empty string");
+
+        this.setAttribute("save-key", saveKey);
+    }
+
+    attributeChangedCallback(name, previous, next) {
+        if (name === "save-key" && previous !== next && this.isConnected && this.frame) {
+            this.save().finally(() => {
+                if (this.getAttribute("save-key") === next)
+                    this.render();
+            });
+
+            return;
+        }
+
+        super.attributeChangedCallback(name, previous, next);
+    }
+
     configureSource(source) {
         source.searchParams.set("mode", "world");
-        source.searchParams.set("pond", getPondIndex(this.getAttribute("pond")).toString());
+        source.searchParams.set("save", this.saveKey);
         source.searchParams.set("social", "0");
-        source.searchParams.delete("resume");
+        source.searchParams.delete("storage");
+    }
+
+    /**
+     * Load or create the world stored under an opaque save key.
+     * @param {String} saveKey Browser storage key
+     */
+    load(saveKey) {
+        if (saveKey === this.saveKey)
+            this.reload();
+        else
+            this.saveKey = saveKey;
     }
 }
 
@@ -199,6 +268,10 @@ export class KoiWorldElement extends KoiFrameElement {
  * Listen for `koi-system:load`, `koi-system:ready`, and `koi-system:session`.
  */
 export class KoiSystemElement extends KoiFrameElement {
+    static get observedAttributes() {
+        return [...super.observedAttributes, "pond", "storage-key", "social"];
+    }
+
     get eventPrefix() {
         return "koi-system";
     }
@@ -209,9 +282,16 @@ export class KoiSystemElement extends KoiFrameElement {
 
     configureSource(source) {
         const pond = this.getAttribute("pond");
+        const storageKey = this.getAttribute("storage-key");
 
         source.searchParams.delete("mode");
         source.searchParams.delete("pond");
+        source.searchParams.delete("save");
+
+        if (storageKey)
+            source.searchParams.set("storage", storageKey);
+        else
+            source.searchParams.delete("storage");
 
         if (pond === null)
             source.searchParams.delete("resume");
@@ -220,6 +300,22 @@ export class KoiSystemElement extends KoiFrameElement {
 
         if (!this.hasAttribute("social"))
             source.searchParams.set("social", "0");
+    }
+
+    /**
+     * Start or resume a pond from the system's three-slot chooser.
+     * @param {Number} pond Pond index from 0 through 2
+     */
+    openPond(pond) {
+        const index = getPondIndex(pond, -1);
+
+        if (index === -1)
+            throw new RangeError("pond must be an integer from 0 through 2");
+
+        if (this.getAttribute("pond") === index.toString())
+            this.reload();
+        else
+            this.setAttribute("pond", index.toString());
     }
 
     /**

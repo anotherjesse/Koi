@@ -18,8 +18,7 @@ let chosenSlot = -1;
 
 const RUNNING_ON_WEBVIEW_IOS = (window.webkit && window.webkit.messageHandlers) ? true : false;
 const WORLD_ONLY = searchParams.get("mode") === "world";
-const REQUESTED_POND = Number.parseInt(searchParams.get("pond") || "0");
-const WORLD_POND = REQUESTED_POND >= 0 && REQUESTED_POND <= 2 ? REQUESTED_POND : 0;
+const WORLD_SAVE_KEY = searchParams.get("save") || "koi-world";
 const SHOW_SOCIAL_LINK = searchParams.get("social") !== "0";
 
 document.documentElement.classList.toggle("koi-world-mode", WORLD_ONLY);
@@ -168,7 +167,7 @@ if (gl &&
         };
 
         let session = new Session();
-        let slot = null;
+        let activeSaveKey = null;
         const slotNames = ["session", "session2", "session3"];
         const storage = new StorageLocal(searchParams.get("storage"));
         const wrapper = document.getElementById("wrapper");
@@ -218,7 +217,7 @@ if (gl &&
          * Save the game state to local storage
          */
         const save = () => {
-            storage.setBuffer(slot, session.serialize(koi, gui));
+            storage.setBuffer(activeSaveKey, session.serialize(koi, gui));
         };
 
         /**
@@ -238,13 +237,31 @@ if (gl &&
                 window.parent.postMessage(message, "*");
         };
 
+        window.addEventListener("message", event => {
+            const message = event.data;
+
+            if (event.source !== window.parent ||
+                !message ||
+                message.source !== "koi-component" ||
+                message.type !== "koi-farm:save")
+                return;
+
+            if (koi)
+                save();
+
+            notifyHost("koi-farm:saved", {
+                requestId: message.requestId,
+                saveKey: activeSaveKey
+            });
+        });
+
         /**
          * A function that creates a new game session
-         * @param {number} index Create a new game at a given slot index
+         * @param {String} saveKey The opaque storage key for this session
+         * @param {Object} detail Public identity for the session
          */
-        const newSession = index => {
-            chosenSlot = index;
-            slot = slotNames[index];
+        const newSession = (saveKey, detail) => {
+            activeSaveKey = saveKey;
             session = new Session();
 
             gui.clear();
@@ -260,39 +277,38 @@ if (gl &&
                 save,
                 WORLD_ONLY ? null : new TutorialBreeding(storage, gui.overlay));
 
-            notifyHost("koi-farm:session", {pond: index, resumed: false});
+            notifyHost("koi-farm:session", Object.assign({resumed: false}, detail));
         };
 
         /**
          * Continue an existing game
-         * @param {number} index Create a new game at a given slot index
+         * @param {String} saveKey The opaque storage key for this session
+         * @param {Object} detail Public identity for the session
          */
-        const continueGame = index => {
-            chosenSlot = index;
-            slot = slotNames[index];
+        const continueGame = (saveKey, detail) => {
+            activeSaveKey = saveKey;
 
             gui.cards.enableBookButton(audio);
 
             try {
-                session.deserialize(storage.getBuffer(slot));
+                session.deserialize(storage.getBuffer(activeSaveKey));
 
                 koi = session.makeKoi(storage, systems, audio, gui, save);
 
-                notifyHost("koi-farm:session", {pond: index, resumed: true});
+                notifyHost("koi-farm:session", Object.assign({resumed: true}, detail));
             } catch (error) {
-                newSession(index);
+                newSession(saveKey, detail);
 
                 console.warn(error);
             }
         };
 
-        const resumables = [
-            storage.getBuffer(slotNames[0]) !== null,
-            storage.getBuffer(slotNames[1]) !== null,
-            storage.getBuffer(slotNames[2]) !== null
-        ];
+        const resumables = WORLD_ONLY ? null : slotNames.map(saveKey =>
+            storage.getBuffer(saveKey) !== null);
+        const worldResumable = WORLD_ONLY && storage.getBuffer(WORLD_SAVE_KEY) !== null;
 
-        loader.setResumables(resumables);
+        if (resumables)
+            loader.setResumables(resumables);
 
         // Trigger the animation frame loop
         lastTime = performance.now();
@@ -407,11 +423,23 @@ if (gl &&
                 menu.show();
         });
 
-        loader.setNewGameCallback(newSession);
-        loader.setContinueCallback(continueGame);
-
-        if (WORLD_ONLY)
-            loader.setAutomaticSlot(WORLD_POND);
+        if (WORLD_ONLY) {
+            loader.setNewGameCallback(saveKey =>
+                newSession(saveKey, {saveKey: saveKey}));
+            loader.setContinueCallback(saveKey =>
+                continueGame(saveKey, {saveKey: saveKey}));
+            loader.setAutomaticSave(WORLD_SAVE_KEY, worldResumable);
+        }
+        else {
+            loader.setNewGameCallback(index => {
+                chosenSlot = index;
+                newSession(slotNames[index], {pond: index});
+            });
+            loader.setContinueCallback(index => {
+                chosenSlot = index;
+                continueGame(slotNames[index], {pond: index});
+            });
+        }
 
         loader.setFinishCallback(() => {
             requestAnimationFrame(loop);
@@ -419,9 +447,14 @@ if (gl &&
             audioEngine.interact();
         });
 
-        notifyHost("koi-farm:ready", {
+        notifyHost("koi-farm:ready", WORLD_ONLY ? {
             locale: chosenLocale,
-            mode: WORLD_ONLY ? "world" : "system",
+            mode: "world",
+            saveKey: WORLD_SAVE_KEY,
+            resumable: worldResumable
+        } : {
+            locale: chosenLocale,
+            mode: "system",
             resumables: resumables
         });
     }, onFailure);

@@ -32,9 +32,15 @@ test("the package exposes the embeddable web component", async () => {
     assert.match(component, /class KoiFarmElement/);
     assert.match(component, /defineElement\("koi-world"/);
     assert.match(component, /defineElement\("koi-system"/);
+
+    const worldElement = component.slice(
+        component.indexOf("export class KoiWorldElement"),
+        component.indexOf("export class KoiSystemElement"));
+
+    assert.doesNotMatch(worldElement, /getPondIndex|openPond/);
 });
 
-test("embedded saves can be isolated with a storage namespace", async () => {
+test("world saves use opaque keys while system saves retain their namespace", async () => {
     const [storage, main, component] = await Promise.all([
         read("js/storage/storageLocal.js"),
         read("js/main.js"),
@@ -42,11 +48,17 @@ test("embedded saves can be isolated with a storage namespace", async () => {
     ]);
 
     assert.match(storage, /this\.prefix/);
-    assert.match(main, /searchParams\.get\("storage"\)/);
+    assert.match(main, /WORLD_SAVE_KEY = searchParams\.get\("save"\)/);
+    assert.match(main, /storage\.setBuffer\(activeSaveKey/);
+    assert.match(component, /"save-key"/);
+    assert.match(component, /source\.searchParams\.set\("save", this\.saveKey\)/);
+    assert.match(component, /source\.searchParams\.delete\("storage"\)/);
+    assert.match(component, /type: "koi-farm:save"/);
+    assert.match(main, /notifyHost\("koi-farm:saved"/);
     assert.match(component, /storage-key/);
 });
 
-test("world mode bypasses the system UI and automatically starts a pond", async () => {
+test("world mode bypasses the system UI and automatically starts a named save", async () => {
     const [main, loader, style, demo] = await Promise.all([
         read("js/main.js"),
         read("js/koi/gui/loader/loader.js"),
@@ -55,11 +67,14 @@ test("world mode bypasses the system UI and automatically starts a pond", async 
     ]);
 
     assert.match(main, /WORLD_ONLY/);
-    assert.match(main, /loader\.setAutomaticSlot\(WORLD_POND\)/);
+    assert.match(main, /loader\.setAutomaticSave\(WORLD_SAVE_KEY, worldResumable\)/);
     assert.match(main, /WORLD_ONLY \? null : new TutorialBreeding/);
-    assert.match(loader, /automaticSlot/);
+    assert.match(loader, /automaticSave/);
+    assert.doesNotMatch(loader, /automaticSlot/);
     assert.match(style, /\.koi-world-mode #gui/);
     assert.match(style, /visibility: hidden/);
     assert.match(demo, /<koi-world/);
+    assert.match(demo, /save-key="world-demo:garden"/);
+    assert.doesNotMatch(demo, /pond=/);
     assert.doesNotMatch(demo, /<koi-farm/);
 });
