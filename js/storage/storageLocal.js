@@ -2,11 +2,22 @@
  * A storage system using the browsers local storage
  * @constructor
  */
-const StorageLocal = function() {
+const StorageLocal = function(namespace) {
     StorageSystem.call(this);
+
+    this.prefix = namespace ? namespace + ":" : "";
 };
 
 StorageLocal.prototype = Object.create(StorageSystem.prototype);
+
+/**
+ * Get the browser storage key for a game key
+ * @param {String} key The game storage key
+ * @returns {String} The namespaced browser storage key
+ */
+StorageLocal.prototype.makeKey = function(key) {
+    return this.prefix + key;
+};
 
 /**
  * Set the value of an item
@@ -14,7 +25,7 @@ StorageLocal.prototype = Object.create(StorageSystem.prototype);
  * @param {String} value The value of the item
  */
 StorageLocal.prototype.set = function(key, value) {
-    window["localStorage"].setItem(key, value);
+    window["localStorage"].setItem(this.makeKey(key), value);
 };
 
 /**
@@ -32,7 +43,7 @@ StorageLocal.prototype.setBuffer = function(key, value) {
  * @returns {String|null} The value of the item, or null if it does not exist
  */
 StorageLocal.prototype.get = function(key) {
-    return window["localStorage"].getItem(key);
+    return window["localStorage"].getItem(this.makeKey(key));
 };
 
 /**
@@ -54,7 +65,7 @@ StorageLocal.prototype.getBuffer = function(key) {
  * @param {String} key The key of the item
  */
 StorageLocal.prototype.remove = function(key) {
-    window["localStorage"].removeItem(key);
+    window["localStorage"].removeItem(this.makeKey(key));
 };
 
 /**

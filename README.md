@@ -1,23 +1,53 @@
 # Koi Farm
 
-A Koi breeding game. Get it [on steam](https://store.steampowered.com/app/1518810/Koi_Farm) or [on itch.io](https://jobtalle.itch.io/koifarm).
+A browser-first Koi breeding game. It runs as a standalone site and can be embedded in another project as a web component. Get the original desktop release [on Steam](https://store.steampowered.com/app/1518810/Koi_Farm) or [on itch.io](https://jobtalle.itch.io/koifarm).
 
 [![alt text](screenshots.png "Koi Farm")](https://youtu.be/2JS6PEr1jUo)
 
-## Building
+## Run locally
 
-HTML, CSS and Javascript content is compressed using [squish.py](https://github.com/jobtalle/squish.py), which is included in this repository as a submodule. Before building, ensure that this library has been cloned as well.
+Clone the repository with its translation submodule, then start the zero-dependency development server:
 
-Make sure [node.js](https://www.nodejs.org) and [python 3](https://www.python.org/) are installed. After calling `npm i` to install all required packages, the following commands can be used to create binaries using [electron](https://github.com/electron/electron):
+```sh
+git clone --recurse-submodules https://github.com/jobtalle/Koi.git
+cd Koi
+npm run dev
+```
 
-| Operating system | Command |
-| --- | --- |
-| Windows (32 bit) | `npm run build-win-32` |
-| Windows (64 bit) | `npm run build-win-64` |
-| Linux (64 bit) | `npm run build-linux-64` |
-| Mac (64 bit) | `npm run build-mac-64` |
+Open `http://127.0.0.1:4173/` for the standalone game or `http://127.0.0.1:4173/embed/` for the embedding example.
 
-Additionally, `npm run compress` can be called to compress HTML, CSS and Javscript content without building binaries. The compressed HTML file `release.html` will be created in the project root. The file requires the `audio`, `font`, `svg` and `language` directories to run, as well as `favicon.ico` and `manifest.json`.
+Create a deployable static site in `dist/` with:
+
+```sh
+npm run build
+npm run preview
+```
+
+## Embed in another project
+
+Serve this package's browser assets from a public path, import the custom element, and point it at the game entry page:
+
+```html
+<script type="module" src="/koi/embed/koi-farm.js"></script>
+
+<koi-farm
+    src="/koi/index.html"
+    storage-key="my-site"
+    title="My koi pond">
+</koi-farm>
+```
+
+The component fills its available width with a 3:2 aspect ratio. These optional attributes configure an instance:
+
+- `lang`: a supported locale such as `en-metric`, `ja`, or `nl`.
+- `pond`: immediately open pond `0`, `1`, or `2`.
+- `storage-key`: namespace save data when a site hosts multiple instances.
+- `social`: show the Discord link; it is hidden in embeds by default.
+- `loading`: set the iframe loading mode to `eager` or `lazy`.
+
+The element emits `koi-farm:load`, `koi-farm:ready`, and `koi-farm:session` events. It also exposes `openPond(index)`, `openMenu()`, and `reload()` methods.
+
+When consuming the package from JavaScript, importing `koifarm` registers the element and also exports `KoiFarmElement` and `defineKoiFarmElement`.
 
 ## Translations
 

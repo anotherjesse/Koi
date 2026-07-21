@@ -48,8 +48,13 @@ LoaderFullscreen.prototype.setLoaded = function() {
  * Toggle fullscreen
  */
 LoaderFullscreen.prototype.toggle = function() {
-    if (document.fullscreenElement)
-        document.exitFullscreen();
-    else
+    if (!document.fullscreenEnabled || !this.wrapper.requestFullscreen)
+        return;
+
+    const action = document.fullscreenElement ?
+        document.exitFullscreen() :
         this.wrapper.requestFullscreen();
+
+    if (action && action.catch)
+        action.catch(error => console.warn("Fullscreen request was rejected", error));
 };

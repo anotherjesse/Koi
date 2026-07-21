@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Koi Farm embed example</title>
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: system-ui, sans-serif;
+            background: #eef3e8;
+            color: #25311e;
+        }
+
+        body {
+            box-sizing: border-box;
+            min-height: 100vh;
+            margin: 0;
+            padding: clamp(16px, 4vw, 56px);
+            display: grid;
+            place-items: center;
+        }
+
+        main {
+            width: min(1120px, 100%);
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: clamp(1.5rem, 3vw, 2.5rem);
+        }
+
+        p {
+            margin: 0 0 24px;
+            color: #52624a;
+        }
+
+        koi-farm {
+            width: 100%;
+            border-radius: 18px;
+            box-shadow: 0 24px 64px rgb(37 49 30 / 18%);
+        }
+    </style>
+</head>
+<body>
+<main>
+    <h1>Koi Farm, embedded</h1>
+    <p>The game is isolated inside a reusable <code>&lt;koi-farm&gt;</code> web component. <span id="status">Loading…</span></p>
+    <koi-farm storage-key="embed-demo" title="Koi Farm embedded demo"></koi-farm>
+</main>
+<script type="module">
+    import "./koi-farm.js";
+
+    const game = document.querySelector("koi-farm");
+    const status = document.getElementById("status");
+
+    game.addEventListener("koi-farm:ready", event => {
+        status.textContent = `Ready (${event.detail.locale})`;
+    });
+</script>
+</body>
+</html>

@@ -21,7 +21,7 @@ const Loader = function(
     this.icon = new LoaderIcon();
     this.elementSlots = elementSlots;
     this.elementButtonSettings = elementButtonSettings;
-    this.elementDiscord = new LoaderDiscord();
+    this.elementDiscord = loadDiscord ? new LoaderDiscord() : null;
     this.resumables = null;
     this.outstanding = 0;
     this.finished = 0;
@@ -37,7 +37,8 @@ const Loader = function(
 
     this.slots = null;
 
-    element.appendChild(this.elementDiscord.element);
+    if (this.elementDiscord)
+        element.appendChild(this.elementDiscord.element);
 
     if (loadFullscreen)
         element.appendChild(this.fullscreen.element);
@@ -119,7 +120,7 @@ Loader.prototype.hide = function() {
     }, 1000 * this.TRANSITION);
 
     if (this.menu)
-        this.menu.addQuitOption();
+        this.menu.addGameOptions();
 };
 
 /**

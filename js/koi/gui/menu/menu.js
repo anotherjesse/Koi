@@ -32,7 +32,6 @@ Menu.prototype.LANG_FLASHES = "TOGGLE_FLASHES";
 Menu.prototype.LANG_FULLSCREEN = "TOGGLE_FULLSCREEN";
 Menu.prototype.LANG_MENU = "MENU";
 Menu.prototype.LANG_LANGUAGE = "LANGUAGE";
-Menu.prototype.LANG_QUIT = "QUIT";
 Menu.prototype.LANG_EXIT = "BACK";
 Menu.prototype.KEY_VOLUME = "volume";
 Menu.prototype.KEY_LANGUAGE = "language";
@@ -102,18 +101,11 @@ Menu.prototype.createBox = function(
 };
 
 /**
- * Add the save & quit option
- * @param {AudioBank} audio Game audio
+ * Add the in-game navigation options
  */
-Menu.prototype.addQuitOption = function(audio) {
-    const quit = this.createButtonQuit();
-
+Menu.prototype.addGameOptions = function() {
     this.box.removeChild(this.buttonBack);
     this.box.appendChild(this.createButtonMenu());
-
-    if (quit)
-        this.box.appendChild(quit);
-
     this.box.appendChild(this.buttonBack);
 };
 
@@ -351,27 +343,6 @@ Menu.prototype.createButtonMenu = function() {
     };
 
     return element;
-};
-
-/**
- * Create the quit button
- * @returns {HTMLButtonElement|null} The quit button, or null if this is not possible
- */
-Menu.prototype.createButtonQuit = function() {
-    if (window["require"]) {
-        const remote = window["require"]("electron")["remote"];
-        const w = remote["getCurrentWindow"]();
-        const element = document.createElement("button");
-
-        element.appendChild(document.createTextNode(language.get(this.LANG_QUIT)));
-        element.onclick = () => {
-            w["close"]();
-        };
-
-        return element;
-    }
-
-    return null;
 };
 
 /**

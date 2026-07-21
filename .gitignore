@@ -3,6 +3,7 @@ node_modules
 package-lock.json
 
 # build artifacts
+dist
 KoiFarm-win32*
 KoiFarm-linux-x64
 KoiFarm-darwin-x64

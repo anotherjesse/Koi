@@ -17,6 +17,7 @@ let chosenSlot = -1;
  */
 
 const RUNNING_ON_WEBVIEW_IOS = (window.webkit && window.webkit.messageHandlers) ? true : false;
+const SHOW_SOCIAL_LINK = searchParams.get("social") !== "0";
 
 /**
  * Reload the game into the menu
@@ -135,7 +136,7 @@ const makeLanguage = locale => {
     }
 };
 
-const paramLang = window["localStorage"].getItem(Menu.prototype.KEY_LANGUAGE) || searchParams.get("lang");
+const paramLang = searchParams.get("lang") || window["localStorage"].getItem(Menu.prototype.KEY_LANGUAGE);
 const language = paramLang ? makeLanguage(paramLang) : makeLanguage(navigator.language.substring(0, 2));
 const loader = new Loader(
     document.getElementById("loader"),
@@ -143,7 +144,7 @@ const loader = new Loader(
     document.getElementById("loader-slots"),
     document.getElementById("loader-button-settings"),
     document.getElementById("wrapper"),
-    !RUNNING_ON_WEBVIEW_IOS,
+    !RUNNING_ON_WEBVIEW_IOS && SHOW_SOCIAL_LINK,
     !RUNNING_ON_WEBVIEW_IOS);
 let imperial = false;
 
@@ -151,7 +152,8 @@ if (gl &&
     gl.getExtension("OES_element_index_uint") &&
     (gl.vao = gl.getExtension("OES_vertex_array_object"))) {
     const audioEngine = new AudioEngine(new Random());
-    const audio = new AudioBank(audioEngine);
+    const audioFormat = document.createElement("audio").canPlayType('audio/ogg; codecs="vorbis"') ? "ogg" : "wav";
+    const audio = new AudioBank(audioEngine, audioFormat);
 
     language.load(() => {
         imperial = language.get("UNIT_LENGTH") === "ft";
@@ -163,7 +165,7 @@ if (gl &&
         let session = new Session();
         let slot = null;
         const slotNames = ["session", "session2", "session3"];
-        const storage = window["require"] ? new StorageFile() : new StorageLocal();
+        const storage = new StorageLocal(searchParams.get("storage"));
         const wrapper = document.getElementById("wrapper");
         const gui = new GUI(
             document.getElementById("gui"),
@@ -214,6 +216,23 @@ if (gl &&
         };
 
         /**
+         * Notify an embedding page about a lifecycle event without exposing save data
+         * @param {String} type The event type
+         * @param {Object} detail Public event details
+         */
+        const notifyHost = (type, detail) => {
+            const message = Object.assign({
+                source: "koi-farm",
+                type: type
+            }, detail || {});
+
+            window.dispatchEvent(new CustomEvent(type, {detail: message}));
+
+            if (window.parent !== window)
+                window.parent.postMessage(message, "*");
+        };
+
+        /**
          * A function that creates a new game session
          * @param {number} index Create a new game at a given slot index
          */
@@ -228,6 +247,8 @@ if (gl &&
                 koi.free();
 
             koi = session.makeKoi(storage, systems, audio, gui, save, new TutorialBreeding(storage, gui.overlay));
+
+            notifyHost("koi-farm:session", {pond: index, resumed: false});
         };
 
         /**
@@ -244,6 +265,8 @@ if (gl &&
                 session.deserialize(storage.getBuffer(slot));
 
                 koi = session.makeKoi(storage, systems, audio, gui, save);
+
+                notifyHost("koi-farm:session", {pond: index, resumed: true});
             } catch (error) {
                 newSession(index);
 
@@ -375,6 +398,8 @@ if (gl &&
 
         loader.setNewGameCallback(newSession);
         loader.setContinueCallback(continueGame);
+
+        notifyHost("koi-farm:ready", {locale: chosenLocale});
     }, onFailure);
 
     // Create globally available SVG defs
