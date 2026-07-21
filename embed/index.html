@@ -18,12 +18,17 @@
     <div class="world-toolbar">
         <p class="status" id="status">Loading the world…</p>
         <div class="world-controls" role="group" aria-label="Choose a host-managed world">
-            <button type="button" data-save-key="world-demo:garden" class="active">Garden</button>
-            <button type="button" data-save-key="world-demo:courtyard">Courtyard</button>
+            <button type="button" data-save-key="world-demo:garden-population" class="active">Garden</button>
+            <button type="button" data-save-key="world-demo:courtyard-population">Courtyard</button>
         </div>
     </div>
     <div class="world-stage">
-        <koi-world id="demo-world" save-key="world-demo:garden" title="Standalone Koi world"></koi-world>
+        <koi-world
+            id="demo-world"
+            save-key="world-demo:garden-population"
+            initial-population="10"
+            title="Standalone Koi world">
+        </koi-world>
         <koi-world-controls for="demo-world"></koi-world-controls>
     </div>
 </main>
@@ -45,7 +50,7 @@
 
     world.addEventListener("koi-world:session", event => {
         live = true;
-        status.textContent = `World “${event.detail.saveKey}” is live (${event.detail.resumed ? "resumed" : "new"})`;
+        status.textContent = `World “${event.detail.saveKey}” is live (${event.detail.resumed ? "resumed" : "new"}, ${event.detail.population.total} fish)`;
 
         for (const button of worldButtons)
             button.classList.toggle("active", button.dataset.saveKey === event.detail.saveKey);

@@ -40,9 +40,12 @@ Serve this package's browser assets from a public path, import the component mod
 <koi-world
     src="/koi/index.html"
     save-key="homepage-pond"
+    initial-population="12"
     title="My koi pond">
 </koi-world>
 ```
+
+`initial-population` is an optional count of random fish placed in the river when a save is created. It is deliberately ignored when `save-key` already has a save, so embedding configuration never overwrites an existing population. Omitting it preserves Koi Farm's original starter pair; `initial-population="0"` creates an empty world.
 
 Add the complete system separately when a project needs it:
 
@@ -59,6 +62,16 @@ An optional controls component can target a world by ID. It is separate from the
 
 The controls expose automatic weather plus `sunny`, `overcast`, `drizzle`, `rain`, and `thunderstorm` presets, along with volume, grass sounds, and lightning flashes. The weather presets use the simulation's existing weather, wind, precipitation, ambient color, insect, and audio behavior. Koi Farm does not currently simulate time of day, so there is no day/night control.
 
+Fish can be added while a world is running. With no specification, `addFish()` adds one random fish to the river. A specification can select a destination, built-in wild preset, and count:
+
+```js
+await world.addFish();
+await world.addFish({destination: "large", preset: "gold", count: 3});
+await world.addFish({destination: "small", preset: "black"});
+```
+
+Destinations are `river`, `large`, and `small`. Presets are `random`, `white`, `black`, `gold`, and `brown`. For an exact genetic specification, pass `body` instead of `preset`; it accepts the base64 `FishBody` representation used by Koi Farm's portable fish codes. The returned promise reports `{added, population}`, and the component also emits `koi-world:fish-added`.
+
 Each component fills its available width with a 3:2 aspect ratio. `<koi-world>` accepts an opaque `save-key`, so applications can create any number of independently saved worlds without exposing the system's slot model:
 
 ```html
@@ -70,12 +83,13 @@ The exact key is used for save and load in browser storage. If omitted, it defau
 
 - `lang`: a supported locale such as `en-metric`, `ja`, or `nl`.
 - `save-key`: the arbitrary save name for `<koi-world>`.
+- `initial-population`: random river fish count for a new `<koi-world>` save; ignored when resuming.
 - `pond`: open system slot `0`, `1`, or `2`; only used by `<koi-system>`.
 - `storage-key`: namespace all system save slots; only used by `<koi-system>`.
 - `social`: show the Discord link in `<koi-system>`; it is hidden by default and is always omitted from `<koi-world>`.
 - `loading`: set the iframe loading mode to `eager` or `lazy`.
 
-The components emit prefixed lifecycle events: `koi-world:load`, `koi-world:ready`, `koi-world:session`, `koi-world:saved`, and `koi-world:control` for the world; `koi-system:*` for the complete system. A world exposes `saveKey`, `load(saveKey)`, `save()`, `reload()`, `setWeather(preset)`, `setVolume(level)`, `setGrassAudio(enabled)`, and `setFlashes(enabled)`. Switching keys saves the current world before loading the next one. The system exposes `openPond(index)`, `openMenu()`, and `reload()`.
+The components emit prefixed lifecycle events: `koi-world:load`, `koi-world:ready`, `koi-world:session`, `koi-world:saved`, `koi-world:control`, and `koi-world:fish-added` for the world; `koi-system:*` for the complete system. A world exposes `saveKey`, `initialPopulation`, `load(saveKey)`, `save()`, `reload()`, `addFish(spec)`, `setWeather(preset)`, `setVolume(level)`, `setGrassAudio(enabled)`, and `setFlashes(enabled)`. Switching keys saves the current world before loading the next one. The system exposes `openPond(index)`, `openMenu()`, and `reload()`.
 
 When consuming the package from JavaScript, importing `koifarm` registers all four tags and exports `KoiWorldElement`, `KoiWorldControlsElement`, `KoiSystemElement`, `KoiFarmElement`, and their registration helpers.
 

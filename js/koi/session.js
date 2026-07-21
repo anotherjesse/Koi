@@ -20,6 +20,7 @@ const Session = function(
  * @param {GUI} gui The GUI
  * @param {Function} save A function that saves the game
  * @param {Tutorial} [tutorial] The tutorial object, or null if no tutorial is active
+ * @param {Number|null} [initialPopulation] Initial random river population for a new session
  * @returns {Koi} A koi object for this session
  */
 Session.prototype.makeKoi = function(
@@ -28,7 +29,8 @@ Session.prototype.makeKoi = function(
     audio,
     gui,
     save,
-    tutorial = null) {
+    tutorial = null,
+    initialPopulation = null) {
     const koi = new Koi(storage, systems, audio, gui, this.environmentSeed, save, tutorial, this.random);
 
     if (this.buffer) {
@@ -38,7 +40,7 @@ Session.prototype.makeKoi = function(
         this.buffer = null;
     }
     else
-        koi.initialize();
+        koi.initialize(initialPopulation);
 
     return koi;
 };

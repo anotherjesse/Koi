@@ -80,7 +80,8 @@ test("world mode bypasses the system UI and automatically starts a named save", 
     assert.match(style, /visibility: hidden/);
     assert.match(demo, /<koi-world/);
     assert.match(demo, /<koi-world-controls for="demo-world"/);
-    assert.match(demo, /save-key="world-demo:garden"/);
+    assert.match(demo, /save-key="world-demo:garden-population"/);
+    assert.match(demo, /initial-population="10"/);
     assert.doesNotMatch(demo, /pond=/);
     assert.doesNotMatch(demo, /<koi-farm/);
 });
@@ -106,4 +107,27 @@ test("world controls expose existing runtime weather and accessibility settings"
     assert.match(koi, /Koi\.prototype\.setWeather/);
     assert.match(weather, /setControlledState/);
     assert.match(weatherState, /allowTransition/);
+});
+
+test("worlds expose runtime fish injection and new-save initial populations", async () => {
+    const [component, controls, main, session, koi, demo] = await Promise.all([
+        read("embed/koi-farm.js"),
+        read("embed/koi-world-controls.js"),
+        read("js/main.js"),
+        read("js/koi/session.js"),
+        read("js/koi/koi.js"),
+        read("embed/index.html")
+    ]);
+
+    assert.match(component, /get initialPopulation\(\)/);
+    assert.match(component, /addFish\(spec = \{\}\)/);
+    assert.match(component, /type: "koi-farm:add-fish"/);
+    assert.match(controls, /data-add-fish/);
+    assert.match(main, /WORLD_INITIAL_POPULATION/);
+    assert.match(main, /message\.type === "koi-farm:add-fish"/);
+    assert.match(main, /notifyHost\("koi-farm:fish-added"/);
+    assert.match(session, /koi\.initialize\(initialPopulation\)/);
+    assert.match(koi, /Koi\.prototype\.addFish/);
+    assert.match(koi, /Koi\.prototype\.getPopulation/);
+    assert.match(demo, /initial-population="10"/);
 });

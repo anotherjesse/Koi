@@ -82,6 +82,12 @@ Koi.prototype.WEATHER_PRESETS = {
     rain: WeatherState.prototype.ID_RAIN,
     thunderstorm: WeatherState.prototype.ID_THUNDERSTORM
 };
+Koi.prototype.FISH_PRESETS = {
+    white: 0,
+    black: 1,
+    gold: 2,
+    brown: 3
+};
 
 /**
  * Serialize the koi
@@ -168,10 +174,134 @@ Koi.prototype.onUnlock = function() {
 };
 
 /**
- * Perform first time initialization
+ * Perform first time initialization.
+ * @param {Number|null} [initialPopulation] Random river fish count, or null for the original population
  */
-Koi.prototype.initialize = function() {
-    this.spawner.spawnInitial(this.systems.atlas, this.systems.randomSource, this.random);
+Koi.prototype.initialize = function(initialPopulation = null) {
+    if (initialPopulation === null) {
+        this.spawner.spawnInitial(this.systems.atlas, this.systems.randomSource, this.random);
+
+        return;
+    }
+
+    this.addFish({
+        destination: "river",
+        preset: "random",
+        count: initialPopulation
+    });
+};
+
+/**
+ * Get fish counts for every public destination.
+ * @returns {Object} Population counts
+ */
+Koi.prototype.getPopulation = function() {
+    const population = {
+        river: this.constellation.river.getFishCount(),
+        large: this.constellation.big.getFishCount(),
+        small: this.constellation.small.getFishCount()
+    };
+
+    population.total = population.river + population.large + population.small;
+
+    return population;
+};
+
+/**
+ * Validate all palette references in a deserialized fish body.
+ * @param {FishBody} body A fish body
+ */
+Koi.prototype.validateFishBody = function(body) {
+    const layers = [body.pattern.base, ...body.pattern.layers];
+
+    for (const layer of layers)
+        if (!Number.isInteger(layer.paletteIndex) ||
+            layer.paletteIndex < Palette.INDEX_WHITE ||
+            layer.paletteIndex > Palette.INDEX_LAST)
+            throw new RangeError("Invalid fish palette index");
+};
+
+/**
+ * Make a fish body from a built-in preset or a serialized body.
+ * @param {Object} spec A normalized fish specification
+ * @returns {FishBody} A new fish body
+ */
+Koi.prototype.makeFishBody = function(spec) {
+    if (spec.body) {
+        const buffer = new BinBuffer(spec.body);
+        const body = FishBody.deserialize(buffer);
+
+        if (buffer.at !== buffer.bytes.length)
+            throw new RangeError("Fish body contains trailing data");
+
+        this.validateFishBody(body);
+        this.systems.atlas.write(body.pattern, this.systems.randomSource);
+
+        return body;
+    }
+
+    const blueprints = SpawnerState.prototype.BLUEPRINTS;
+    const index = spec.preset === "random" ?
+        Math.floor(this.random.getFloat() * blueprints.length) :
+        this.FISH_PRESETS[spec.preset];
+
+    if (!Number.isInteger(index) || index < 0 || index >= blueprints.length)
+        throw new RangeError("Invalid fish preset");
+
+    return blueprints[index].blueprintBody.spawn(
+        this.systems.atlas,
+        this.systems.randomSource,
+        this.random);
+};
+
+/**
+ * Add fish to a named body of water.
+ * @param {Object} spec A normalized fish specification
+ * @returns {Object} Added count and updated population totals
+ */
+Koi.prototype.addFish = function(spec) {
+    if (!spec || typeof spec !== "object")
+        throw new TypeError("Fish specification must be an object");
+
+    if (!Number.isInteger(spec.count) || spec.count < 0 || spec.count > this.FISH_CAPACITY)
+        throw new RangeError("Invalid fish count");
+
+    if (spec.body !== undefined) {
+        if (typeof spec.body !== "string" || spec.body === "" || spec.body.length > 4096)
+            throw new TypeError("Invalid serialized fish body");
+    }
+    else if (!Object.prototype.hasOwnProperty.call(this.FISH_PRESETS, spec.preset) && spec.preset !== "random")
+        throw new RangeError("Invalid fish preset");
+
+    const ponds = {
+        river: this.constellation.river,
+        large: this.constellation.big,
+        small: this.constellation.small
+    };
+    const pond = ponds[spec.destination];
+
+    if (!pond)
+        throw new RangeError("Invalid fish destination");
+
+    let added = 0;
+
+    while (added < spec.count && this.constellation.getFishCount() < this.FISH_CAPACITY) {
+        const position = spec.destination === "river" ?
+            this.constellation.initialSpawnPoint.copy() :
+            pond.constraint.position.copy();
+        const direction = spec.destination === "river" ?
+            this.constellation.initialSpawnDirection.copy() :
+            new Vector2().fromAngle(this.random.getFloat() * Math.PI * 2);
+        const fish = new Fish(this.makeFishBody(spec), position, direction);
+
+        pond.addFish(fish);
+        ++added;
+    }
+
+    return {
+        added: added,
+        population: this.getPopulation()
+    };
 };
 
 /**

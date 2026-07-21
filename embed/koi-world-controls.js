@@ -16,6 +16,7 @@ export class KoiWorldControlsElement extends HTMLElementBase {
 
         this.world = null;
         this.onControl = this.onControl.bind(this);
+        this.onSession = this.onSession.bind(this);
         this.attachShadow({mode: "open"});
     }
 
@@ -34,8 +35,10 @@ export class KoiWorldControlsElement extends HTMLElementBase {
     }
 
     disconnectWorld() {
-        if (this.world)
+        if (this.world) {
             this.world.removeEventListener("koi-world:control", this.onControl);
+            this.world.removeEventListener("koi-world:session", this.onSession);
+        }
 
         this.world = null;
     }
@@ -48,6 +51,7 @@ export class KoiWorldControlsElement extends HTMLElementBase {
         if (target && target.localName === "koi-world") {
             this.world = target;
             this.world.addEventListener("koi-world:control", this.onControl);
+            this.world.addEventListener("koi-world:session", this.onSession);
 
             for (const control of ["weather", "volume", "grassAudio", "flashes"]) {
                 const value = this.world.getControl?.(control);
@@ -57,7 +61,7 @@ export class KoiWorldControlsElement extends HTMLElementBase {
             }
         }
 
-        for (const control of this.shadowRoot.querySelectorAll("input, select"))
+        for (const control of this.shadowRoot.querySelectorAll("button, input, select"))
             control.disabled = !this.world;
     }
 
@@ -66,6 +70,13 @@ export class KoiWorldControlsElement extends HTMLElementBase {
             return;
 
         this.updateControl(event.detail.control, event.detail.value);
+    }
+
+    onSession(event) {
+        const addFish = this.shadowRoot.querySelector("[data-add-fish]");
+
+        if (addFish && event.detail.population)
+            addFish.textContent = `Add fish · ${event.detail.population.total} total`;
     }
 
     updateControl(name, value) {
@@ -102,6 +113,13 @@ export class KoiWorldControlsElement extends HTMLElementBase {
                     font-size: 1rem;
                 }
 
+                h3 {
+                    margin: 20px 0 0;
+                    padding-top: 16px;
+                    border-top: 1px solid #d7e0d1;
+                    font-size: .875rem;
+                }
+
                 label {
                     display: grid;
                     gap: 6px;
@@ -118,12 +136,27 @@ export class KoiWorldControlsElement extends HTMLElementBase {
                     width: 100%;
                 }
 
-                select {
+                select,
+                button {
                     padding: 7px 9px;
                     border: 1px solid #9aac90;
                     border-radius: 8px;
                     background: white;
                     color: inherit;
+                }
+
+                button {
+                    width: 100%;
+                    margin-top: 14px;
+                    background: #426630;
+                    color: white;
+                    cursor: pointer;
+                    font-weight: 700;
+                }
+
+                button:disabled {
+                    cursor: default;
+                    opacity: .55;
                 }
             </style>
             <section part="panel" aria-label="Koi world controls">
@@ -151,6 +184,26 @@ export class KoiWorldControlsElement extends HTMLElementBase {
                     Lightning flashes
                     <input data-control="flashes" type="checkbox" checked>
                 </label>
+                <h3>Add a fish</h3>
+                <label>
+                    Destination
+                    <select data-fish-destination>
+                        <option value="river">River</option>
+                        <option value="large">Large pond</option>
+                        <option value="small">Small pond</option>
+                    </select>
+                </label>
+                <label>
+                    Preset
+                    <select data-fish-preset>
+                        <option value="random">Random</option>
+                        <option value="white">White</option>
+                        <option value="black">Black</option>
+                        <option value="gold">Gold</option>
+                        <option value="brown">Brown</option>
+                    </select>
+                </label>
+                <button type="button" data-add-fish>Add fish</button>
             </section>
         `;
 
@@ -158,11 +211,33 @@ export class KoiWorldControlsElement extends HTMLElementBase {
         const volume = this.shadowRoot.querySelector('[data-control="volume"]');
         const grassAudio = this.shadowRoot.querySelector('[data-control="grassAudio"]');
         const flashes = this.shadowRoot.querySelector('[data-control="flashes"]');
+        const fishDestination = this.shadowRoot.querySelector("[data-fish-destination]");
+        const fishPreset = this.shadowRoot.querySelector("[data-fish-preset]");
+        const addFish = this.shadowRoot.querySelector("[data-add-fish]");
 
         weather.addEventListener("change", () => this.world?.setWeather(weather.value));
         volume.addEventListener("input", () => this.world?.setVolume(volume.valueAsNumber));
         grassAudio.addEventListener("change", () => this.world?.setGrassAudio(grassAudio.checked));
         flashes.addEventListener("change", () => this.world?.setFlashes(flashes.checked));
+        addFish.addEventListener("click", async () => {
+            addFish.disabled = true;
+
+            try {
+                const result = await this.world?.addFish({
+                    destination: fishDestination.value,
+                    preset: fishPreset.value
+                });
+
+                if (result)
+                    addFish.textContent = `Add fish · ${result.population.total} total`;
+            }
+            catch (error) {
+                addFish.textContent = "Could not add fish";
+            }
+            finally {
+                addFish.disabled = false;
+            }
+        });
     }
 }
 

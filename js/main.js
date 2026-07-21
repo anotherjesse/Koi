@@ -20,6 +20,11 @@ const RUNNING_ON_WEBVIEW_IOS = (window.webkit && window.webkit.messageHandlers) 
 const WORLD_ONLY = searchParams.get("mode") === "world";
 const WORLD_SAVE_KEY = searchParams.get("save") || "koi-world";
 const SHOW_SOCIAL_LINK = searchParams.get("social") !== "0";
+const requestedPopulation = Number(searchParams.get("population"));
+const WORLD_INITIAL_POPULATION = searchParams.has("population") &&
+    Number.isInteger(requestedPopulation) &&
+    requestedPopulation >= 0 &&
+    requestedPopulation <= Koi.prototype.FISH_CAPACITY ? requestedPopulation : null;
 
 document.documentElement.classList.toggle("koi-world-mode", WORLD_ONLY);
 
@@ -257,6 +262,30 @@ if (gl &&
                 return;
             }
 
+            if (message.type === "koi-farm:add-fish") {
+                if (!koi)
+                    return;
+
+                try {
+                    const result = koi.addFish(message.spec);
+
+                    save();
+                    notifyHost("koi-farm:fish-added", {
+                        requestId: message.requestId,
+                        added: result.added,
+                        population: result.population
+                    });
+                }
+                catch (error) {
+                    notifyHost("koi-farm:fish-added", {
+                        requestId: message.requestId,
+                        error: error instanceof Error ? error.message : "Invalid fish specification"
+                    });
+                }
+
+                return;
+            }
+
             if (message.type !== "koi-farm:control" || !koi)
                 return;
 
@@ -327,9 +356,13 @@ if (gl &&
                 audio,
                 gui,
                 save,
-                WORLD_ONLY ? null : new TutorialBreeding(storage, gui.overlay));
+                WORLD_ONLY ? null : new TutorialBreeding(storage, gui.overlay),
+                WORLD_ONLY ? WORLD_INITIAL_POPULATION : null);
 
-            notifyHost("koi-farm:session", Object.assign({resumed: false}, detail));
+            notifyHost("koi-farm:session", Object.assign({
+                resumed: false,
+                population: koi.getPopulation()
+            }, detail));
         };
 
         /**
@@ -347,7 +380,10 @@ if (gl &&
 
                 koi = session.makeKoi(storage, systems, audio, gui, save);
 
-                notifyHost("koi-farm:session", Object.assign({resumed: true}, detail));
+                notifyHost("koi-farm:session", Object.assign({
+                    resumed: true,
+                    population: koi.getPopulation()
+                }, detail));
             } catch (error) {
                 newSession(saveKey, detail);
 

@@ -11,6 +11,9 @@ export {
 const HTMLElementBase = globalThis.HTMLElement || class {};
 const DEFAULT_WORLD_SAVE_KEY = "koi-world";
 const WORLD_WEATHER_PRESETS = ["auto", "sunny", "overcast", "drizzle", "rain", "thunderstorm"];
+const FISH_DESTINATIONS = ["river", "large", "small"];
+const FISH_PRESETS = ["random", "white", "black", "gold", "brown"];
+const FISH_CAPACITY = 320;
 
 const getPondIndex = (value, fallback = 0) => {
     if (value === null || value === "")
@@ -222,6 +225,9 @@ export class KoiWorldElement extends KoiFrameElement {
         super();
 
         this.controlValues = new Map();
+        this.sessionReady = false;
+        this.fishRequest = 0;
+        this.fishRequests = new Map();
     }
 
     get eventPrefix() {
@@ -247,6 +253,30 @@ export class KoiWorldElement extends KoiFrameElement {
         this.setAttribute("save-key", saveKey);
     }
 
+    /**
+     * The number of random river fish placed in a newly created save.
+     * Null preserves Koi Farm's original starter population.
+     * @returns {Number|null}
+     */
+    get initialPopulation() {
+        const value = this.getAttribute("initial-population");
+
+        if (value === null || value === "")
+            return null;
+
+        const population = Number(value);
+
+        return Number.isInteger(population) && population >= 0 && population <= FISH_CAPACITY ?
+            population : null;
+    }
+
+    set initialPopulation(population) {
+        if (!Number.isInteger(population) || population < 0 || population > FISH_CAPACITY)
+            throw new RangeError(`initialPopulation must be an integer from 0 through ${FISH_CAPACITY}`);
+
+        this.setAttribute("initial-population", population.toString());
+    }
+
     attributeChangedCallback(name, previous, next) {
         if (name === "save-key" && previous !== next && this.isConnected && this.frame) {
             this.save().finally(() => {
@@ -265,6 +295,17 @@ export class KoiWorldElement extends KoiFrameElement {
         source.searchParams.set("save", this.saveKey);
         source.searchParams.set("social", "0");
         source.searchParams.delete("storage");
+
+        if (this.initialPopulation === null)
+            source.searchParams.delete("population");
+        else
+            source.searchParams.set("population", this.initialPopulation.toString());
+    }
+
+    render() {
+        this.sessionReady = false;
+
+        super.render();
     }
 
     /**
@@ -302,11 +343,29 @@ export class KoiWorldElement extends KoiFrameElement {
 
         const message = event.data;
 
-        if (!message || message.source !== "koi-farm" || message.type !== "koi-farm:session")
+        if (!message || message.source !== "koi-farm")
             return;
 
-        for (const [control, value] of this.controlValues)
-            this.postControl(control, value);
+        if (message.type === "koi-farm:session") {
+            this.sessionReady = true;
+
+            for (const [control, value] of this.controlValues)
+                this.postControl(control, value);
+
+            for (const requestId of this.fishRequests.keys())
+                this.sendFishRequest(requestId);
+        }
+        else if (message.type === "koi-farm:fish-added" && this.fishRequests.has(message.requestId)) {
+            const request = this.fishRequests.get(message.requestId);
+
+            clearTimeout(request.timeout);
+            this.fishRequests.delete(message.requestId);
+
+            if (message.error)
+                request.reject(new Error(message.error));
+            else
+                request.resolve(message);
+        }
     }
 
     getControl(control) {
@@ -347,6 +406,91 @@ export class KoiWorldElement extends KoiFrameElement {
             throw new TypeError("enabled must be a boolean");
 
         this.postControl("flashes", enabled);
+    }
+
+    normalizeFishSpec(spec) {
+        if (spec === null || spec === undefined)
+            spec = {};
+
+        if (typeof spec !== "object" || Array.isArray(spec))
+            throw new TypeError("fish spec must be an object");
+
+        const normalized = {
+            destination: spec.destination || "river",
+            count: spec.count === undefined ? 1 : spec.count
+        };
+
+        if (!FISH_DESTINATIONS.includes(normalized.destination))
+            throw new RangeError(`destination must be one of: ${FISH_DESTINATIONS.join(", ")}`);
+
+        if (!Number.isInteger(normalized.count) || normalized.count < 1 || normalized.count > FISH_CAPACITY)
+            throw new RangeError(`count must be an integer from 1 through ${FISH_CAPACITY}`);
+
+        if (spec.body !== undefined) {
+            if (typeof spec.body !== "string" || spec.body === "" || spec.body.length > 4096)
+                throw new TypeError("body must be a non-empty base64 fish body string");
+
+            normalized.body = spec.body;
+        }
+        else {
+            normalized.preset = spec.preset || "random";
+
+            if (!FISH_PRESETS.includes(normalized.preset))
+                throw new RangeError(`preset must be one of: ${FISH_PRESETS.join(", ")}`);
+        }
+
+        return normalized;
+    }
+
+    sendFishRequest(requestId) {
+        const request = this.fishRequests.get(requestId);
+
+        if (!request || request.sent || !this.sessionReady || !this.gameWindow)
+            return;
+
+        request.sent = true;
+        request.timeout = setTimeout(() => {
+            this.fishRequests.delete(requestId);
+            request.reject(new Error("Koi runtime did not acknowledge the fish request"));
+        }, 5000);
+
+        this.gameWindow.postMessage({
+            source: "koi-component",
+            type: "koi-farm:add-fish",
+            requestId: requestId,
+            spec: request.spec
+        }, "*");
+    }
+
+    /**
+     * Add one or more fish to the active world.
+     * @param {Object} [spec] Fish destination, count, and preset or serialized body
+     * @returns {Promise<Object>} Added count and updated population totals
+     */
+    addFish(spec = {}) {
+        const requestId = `${Date.now()}-${++this.fishRequest}`;
+
+        return new Promise((resolve, reject) => {
+            this.fishRequests.set(requestId, {
+                spec: this.normalizeFishSpec(spec),
+                resolve: resolve,
+                reject: reject,
+                sent: false,
+                timeout: null
+            });
+            this.sendFishRequest(requestId);
+        });
+    }
+
+    disconnectedCallback() {
+        super.disconnectedCallback();
+
+        for (const request of this.fishRequests.values()) {
+            clearTimeout(request.timeout);
+            request.reject(new Error("Koi world disconnected before adding fish"));
+        }
+
+        this.fishRequests.clear();
     }
 }
 
