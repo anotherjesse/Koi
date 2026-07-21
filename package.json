@@ -9,6 +9,8 @@
   "exports": {
     ".": "./embed/koi-farm.js",
     "./embed": "./embed/koi-farm.js",
+    "./world": "./embed/koi-farm.js",
+    "./system": "./embed/koi-farm.js",
     "./package.json": "./package.json"
   },
   "files": [

@@ -29,6 +29,7 @@ const Loader = function(
     this.onFinish = null;
     this.onNewGame = null;
     this.onContinue = null;
+    this.automaticSlot = null;
     this.menu = null;
     this.fullscreen = new LoaderFullscreen(wrapper);
     this.loadFullscreen = loadFullscreen;
@@ -157,6 +158,15 @@ Loader.prototype.complete = function() {
         this.hide();
     };
 
+    if (this.automaticSlot !== null) {
+        if (this.resumables[this.automaticSlot])
+            onContinue(this.automaticSlot);
+        else
+            onNewGame(this.automaticSlot);
+
+        return;
+    }
+
     this.slots = [
         new LoaderSlot(0, "1", onNewGame, this.resumables[0] ? onContinue : null),
         new LoaderSlot(1, "2", onNewGame, this.resumables[1] ? onContinue : null),
@@ -182,7 +192,10 @@ Loader.prototype.complete = function() {
         const slot = Number.parseInt(resumeSlot);
 
         if (slot === 0 || slot === 1 || slot === 2) {
-            onContinue(slot);
+            if (this.resumables[slot])
+                onContinue(slot);
+            else
+                onNewGame(slot);
 
             this.menu.show();
         }
@@ -224,6 +237,14 @@ Loader.prototype.setNewGameCallback = function(onNewGame) {
  */
 Loader.prototype.setContinueCallback = function(onContinue) {
     this.onContinue = onContinue;
+};
+
+/**
+ * Automatically start a pond as soon as loading is complete
+ * @param {Number} slot The pond slot index
+ */
+Loader.prototype.setAutomaticSlot = function(slot) {
+    this.automaticSlot = slot;
 };
 
 /**

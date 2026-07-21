@@ -25,9 +25,13 @@ test("the package exposes the embeddable web component", async () => {
     const component = await read("embed/koi-farm.js");
 
     assert.equal(packageJson.exports["."], "./embed/koi-farm.js");
+    assert.equal(packageJson.exports["./world"], "./embed/koi-farm.js");
+    assert.equal(packageJson.exports["./system"], "./embed/koi-farm.js");
+    assert.match(component, /class KoiWorldElement/);
+    assert.match(component, /class KoiSystemElement/);
     assert.match(component, /class KoiFarmElement/);
-    assert.match(component, /customElements\.define/);
-    assert.match(component, /koi-farm:ready/);
+    assert.match(component, /defineElement\("koi-world"/);
+    assert.match(component, /defineElement\("koi-system"/);
 });
 
 test("embedded saves can be isolated with a storage namespace", async () => {
@@ -40,4 +44,22 @@ test("embedded saves can be isolated with a storage namespace", async () => {
     assert.match(storage, /this\.prefix/);
     assert.match(main, /searchParams\.get\("storage"\)/);
     assert.match(component, /storage-key/);
+});
+
+test("world mode bypasses the system UI and automatically starts a pond", async () => {
+    const [main, loader, style, demo] = await Promise.all([
+        read("js/main.js"),
+        read("js/koi/gui/loader/loader.js"),
+        read("css/style.css"),
+        read("embed/index.html")
+    ]);
+
+    assert.match(main, /WORLD_ONLY/);
+    assert.match(main, /loader\.setAutomaticSlot\(WORLD_POND\)/);
+    assert.match(main, /WORLD_ONLY \? null : new TutorialBreeding/);
+    assert.match(loader, /automaticSlot/);
+    assert.match(style, /\.koi-world-mode #gui/);
+    assert.match(style, /visibility: hidden/);
+    assert.match(demo, /<koi-world/);
+    assert.doesNotMatch(demo, /<koi-farm/);
 });

@@ -14,7 +14,7 @@ cd Koi
 npm run dev
 ```
 
-Open `http://127.0.0.1:4173/` for the standalone game or `http://127.0.0.1:4173/embed/` for the embedding example.
+Open `http://127.0.0.1:4173/` for the standalone game, `http://127.0.0.1:4173/embed/` for the world-only component, or `http://127.0.0.1:4173/embed/system.html` for the complete system component.
 
 Create a deployable static site in `dist/` with:
 
@@ -23,31 +23,45 @@ npm run build
 npm run preview
 ```
 
-## Embed in another project
+## Components
 
-Serve this package's browser assets from a public path, import the custom element, and point it at the game entry page:
+The browser package has two primary component boundaries:
+
+- `<koi-world>` is only the live pond, world, and koi renderer. It automatically starts or resumes a pond and omits the pond chooser, settings menu, cards, and tutorial UI.
+- `<koi-system>` is the complete save-slot and menu experience.
+
+`<koi-farm>` remains available as a backward-compatible alias for `<koi-system>`.
+
+Serve this package's browser assets from a public path, import the component module, and point components at the game entry page when it is hosted somewhere else:
 
 ```html
 <script type="module" src="/koi/embed/koi-farm.js"></script>
 
-<koi-farm
+<koi-world
     src="/koi/index.html"
+    pond="0"
     storage-key="my-site"
     title="My koi pond">
-</koi-farm>
+</koi-world>
 ```
 
-The component fills its available width with a 3:2 aspect ratio. These optional attributes configure an instance:
+Add the complete system separately when a project needs it:
+
+```html
+<koi-system src="/koi/index.html" storage-key="my-site"></koi-system>
+```
+
+Each component fills its available width with a 3:2 aspect ratio. These optional attributes configure an instance:
 
 - `lang`: a supported locale such as `en-metric`, `ja`, or `nl`.
-- `pond`: immediately open pond `0`, `1`, or `2`.
+- `pond`: open pond `0`, `1`, or `2`; `<koi-world>` defaults to `0`.
 - `storage-key`: namespace save data when a site hosts multiple instances.
-- `social`: show the Discord link; it is hidden in embeds by default.
+- `social`: show the Discord link in `<koi-system>`; it is hidden by default and is always omitted from `<koi-world>`.
 - `loading`: set the iframe loading mode to `eager` or `lazy`.
 
-The element emits `koi-farm:load`, `koi-farm:ready`, and `koi-farm:session` events. It also exposes `openPond(index)`, `openMenu()`, and `reload()` methods.
+The components emit prefixed lifecycle events: `koi-world:load`, `koi-world:ready`, and `koi-world:session` for the world; `koi-system:*` for the complete system. Both expose `openPond(index)` and `reload()`. The system also exposes `openMenu()`.
 
-When consuming the package from JavaScript, importing `koifarm` registers the element and also exports `KoiFarmElement` and `defineKoiFarmElement`.
+When consuming the package from JavaScript, importing `koifarm` registers all three tags and exports `KoiWorldElement`, `KoiSystemElement`, `KoiFarmElement`, and their registration helpers.
 
 ## Translations
 

@@ -17,7 +17,12 @@ let chosenSlot = -1;
  */
 
 const RUNNING_ON_WEBVIEW_IOS = (window.webkit && window.webkit.messageHandlers) ? true : false;
+const WORLD_ONLY = searchParams.get("mode") === "world";
+const REQUESTED_POND = Number.parseInt(searchParams.get("pond") || "0");
+const WORLD_POND = REQUESTED_POND >= 0 && REQUESTED_POND <= 2 ? REQUESTED_POND : 0;
 const SHOW_SOCIAL_LINK = searchParams.get("social") !== "0";
+
+document.documentElement.classList.toggle("koi-world-mode", WORLD_ONLY);
 
 /**
  * Reload the game into the menu
@@ -144,8 +149,8 @@ const loader = new Loader(
     document.getElementById("loader-slots"),
     document.getElementById("loader-button-settings"),
     document.getElementById("wrapper"),
-    !RUNNING_ON_WEBVIEW_IOS && SHOW_SOCIAL_LINK,
-    !RUNNING_ON_WEBVIEW_IOS);
+    !RUNNING_ON_WEBVIEW_IOS && SHOW_SOCIAL_LINK && !WORLD_ONLY,
+    !RUNNING_ON_WEBVIEW_IOS && !WORLD_ONLY);
 let imperial = false;
 
 if (gl &&
@@ -172,7 +177,7 @@ if (gl &&
             new CodeViewer(document.getElementById("code"), storage),
             audio);
         const systems = new Systems(gl, new Random(2893), wrapper.clientWidth, wrapper.clientHeight);
-        const menu = new Menu(
+        const menu = WORLD_ONLY ? null : new Menu(
             document.getElementById("menu"),
             loader.fullscreen,
             chosenLocale,
@@ -189,7 +194,8 @@ if (gl &&
 
         new Drop(gui, systems, document.getElementById("drop"), canvas);
 
-        loader.setMenu(menu);
+        if (menu)
+            loader.setMenu(menu);
 
         canvas.width = wrapper.clientWidth;
         canvas.height = wrapper.clientHeight;
@@ -246,7 +252,13 @@ if (gl &&
             if (koi)
                 koi.free();
 
-            koi = session.makeKoi(storage, systems, audio, gui, save, new TutorialBreeding(storage, gui.overlay));
+            koi = session.makeKoi(
+                storage,
+                systems,
+                audio,
+                gui,
+                save,
+                WORLD_ONLY ? null : new TutorialBreeding(storage, gui.overlay));
 
             notifyHost("koi-farm:session", {pond: index, resumed: false});
         };
@@ -274,17 +286,19 @@ if (gl &&
             }
         };
 
-        loader.setResumables([
+        const resumables = [
             storage.getBuffer(slotNames[0]) !== null,
             storage.getBuffer(slotNames[1]) !== null,
             storage.getBuffer(slotNames[2]) !== null
-        ]);
+        ];
+
+        loader.setResumables(resumables);
 
         // Trigger the animation frame loop
         lastTime = performance.now();
 
         const loop = time => {
-            if (loaded) {
+            if (loaded && koi) {
                 koi.render(.001 * (time - lastTime), settings);
 
                 lastTime = time;
@@ -342,7 +356,7 @@ if (gl &&
                 shift = true;
             else if (event.key === "Enter" && alt)
                 loader.fullscreen.toggle();
-            else if (event.key === "Escape" || event.key === "m")
+            else if (menu && (event.key === "Escape" || event.key === "m"))
                 menu.toggle();
             else if (koi && koi.keyDown(event.key))
                 event.preventDefault();
@@ -386,9 +400,18 @@ if (gl &&
         };
 
         window.addEventListener('appMovedToBackground', () => {
-            save();
-            menu.show();
+            if (koi)
+                save();
+
+            if (menu)
+                menu.show();
         });
+
+        loader.setNewGameCallback(newSession);
+        loader.setContinueCallback(continueGame);
+
+        if (WORLD_ONLY)
+            loader.setAutomaticSlot(WORLD_POND);
 
         loader.setFinishCallback(() => {
             requestAnimationFrame(loop);
@@ -396,10 +419,11 @@ if (gl &&
             audioEngine.interact();
         });
 
-        loader.setNewGameCallback(newSession);
-        loader.setContinueCallback(continueGame);
-
-        notifyHost("koi-farm:ready", {locale: chosenLocale});
+        notifyHost("koi-farm:ready", {
+            locale: chosenLocale,
+            mode: WORLD_ONLY ? "world" : "system",
+            resumables: resumables
+        });
     }, onFailure);
 
     // Create globally available SVG defs

@@ -27,6 +27,13 @@ body > svg {
     overflow: hidden;
 }
 
+.koi-world-mode #gui,
+.koi-world-mode #code,
+.koi-world-mode #drop,
+.koi-world-mode #menu {
+    visibility: hidden;
+}
+
 #gui {
     pointer-events: none;
     position: absolute;

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Koi system component</title>
+    <link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<main>
+    <header>
+        <div>
+            <h1>Koi System, embedded</h1>
+            <p>The complete save-slot and settings experience lives in the separate <code>&lt;koi-system&gt;</code> component.</p>
+        </div>
+        <nav><a href="./">← View the world only</a></nav>
+    </header>
+    <p class="status" id="status">Loading the system…</p>
+    <koi-system storage-key="system-demo" title="Complete Koi system"></koi-system>
+</main>
+<script type="module">
+    import "./koi-farm.js";
+
+    const system = document.querySelector("koi-system");
+    const status = document.getElementById("status");
+
+    system.addEventListener("koi-system:ready", event => {
+        status.textContent = `System ready (${event.detail.locale})`;
+    });
+</script>
+</body>
+</html>
+

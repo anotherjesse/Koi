@@ -3,59 +3,36 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Koi Farm embed example</title>
-    <style>
-        :root {
-            color-scheme: light;
-            font-family: system-ui, sans-serif;
-            background: #eef3e8;
-            color: #25311e;
-        }
-
-        body {
-            box-sizing: border-box;
-            min-height: 100vh;
-            margin: 0;
-            padding: clamp(16px, 4vw, 56px);
-            display: grid;
-            place-items: center;
-        }
-
-        main {
-            width: min(1120px, 100%);
-        }
-
-        h1 {
-            margin: 0 0 8px;
-            font-size: clamp(1.5rem, 3vw, 2.5rem);
-        }
-
-        p {
-            margin: 0 0 24px;
-            color: #52624a;
-        }
-
-        koi-farm {
-            width: 100%;
-            border-radius: 18px;
-            box-shadow: 0 24px 64px rgb(37 49 30 / 18%);
-        }
-    </style>
+    <title>Koi world component</title>
+    <link rel="stylesheet" href="demo.css">
 </head>
 <body>
 <main>
-    <h1>Koi Farm, embedded</h1>
-    <p>The game is isolated inside a reusable <code>&lt;koi-farm&gt;</code> web component. <span id="status">Loading…</span></p>
-    <koi-farm storage-key="embed-demo" title="Koi Farm embedded demo"></koi-farm>
+    <header>
+        <div>
+            <h1>Koi World, embedded</h1>
+            <p>The live renderer is a standalone <code>&lt;koi-world&gt;</code> component—no pond chooser, settings menu, cards, or tutorial overlay.</p>
+        </div>
+        <nav><a href="system.html">View the full system →</a></nav>
+    </header>
+    <p class="status" id="status">Loading the world…</p>
+    <koi-world storage-key="world-demo" pond="0" title="Standalone Koi world"></koi-world>
 </main>
 <script type="module">
     import "./koi-farm.js";
 
-    const game = document.querySelector("koi-farm");
+    const world = document.querySelector("koi-world");
     const status = document.getElementById("status");
+    let live = false;
 
-    game.addEventListener("koi-farm:ready", event => {
-        status.textContent = `Ready (${event.detail.locale})`;
+    world.addEventListener("koi-world:ready", event => {
+        if (!live)
+            status.textContent = `Runtime ready (${event.detail.locale}); preparing the pond…`;
+    });
+
+    world.addEventListener("koi-world:session", event => {
+        live = true;
+        status.textContent = `Pond ${event.detail.pond + 1} is live`;
     });
 </script>
 </body>

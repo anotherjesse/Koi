@@ -1,14 +1,22 @@
 const HTMLElementBase = globalThis.HTMLElement || class {};
 
+const getPondIndex = (value, fallback = 0) => {
+    if (value === null || value === "")
+        return fallback;
+
+    const pond = Number(value);
+
+    return Number.isInteger(pond) && pond >= 0 && pond <= 2 ? pond : fallback;
+};
+
 /**
- * Embed Koi Farm as an isolated, responsive browser application.
+ * Shared iframe boundary for Koi components.
  *
- * The iframe boundary keeps the legacy renderer's global styles and IDs from
- * leaking into the host project while exposing lifecycle events on the custom
- * element. Listen for `koi-farm:load`, `koi-farm:ready`, and
- * `koi-farm:session` on the element.
+ * The frame isolates the legacy renderer's global styles and IDs from the host
+ * project while the element forwards lifecycle events through a small public
+ * API.
  */
-export class KoiFarmElement extends HTMLElementBase {
+export class KoiFrameElement extends HTMLElementBase {
     static get observedAttributes() {
         return ["src", "lang", "pond", "storage-key", "social", "loading", "title"];
     }
@@ -21,7 +29,7 @@ export class KoiFarmElement extends HTMLElementBase {
     }
 
     connectedCallback() {
-        this.classList.add("koi-farm-element");
+        this.classList.add("koi-embed-element");
         window.addEventListener("message", this.onMessage);
         this.render();
     }
@@ -35,8 +43,16 @@ export class KoiFarmElement extends HTMLElementBase {
             this.render();
     }
 
+    get eventPrefix() {
+        return "koi";
+    }
+
+    get defaultTitle() {
+        return "Koi";
+    }
+
     /**
-     * The window hosting the game, when it is available.
+     * The window hosting the component runtime, when it is available.
      * @returns {Window|null}
      */
     get gameWindow() {
@@ -44,7 +60,15 @@ export class KoiFarmElement extends HTMLElementBase {
     }
 
     /**
-     * Build the game URL from the element attributes.
+     * Add component-specific parameters to the runtime URL.
+     * @param {URL} source Runtime URL
+     */
+    configureSource(source) {
+
+    }
+
+    /**
+     * Build the runtime URL from the element attributes.
      * @returns {String}
      */
     makeSource() {
@@ -53,7 +77,6 @@ export class KoiFarmElement extends HTMLElementBase {
             new URL(configuredSource, document.baseURI) :
             new URL("../index.html", import.meta.url);
         const language = this.getAttribute("lang");
-        const pond = this.getAttribute("pond");
         const storageKey = this.getAttribute("storage-key");
 
         source.searchParams.set("embed", "1");
@@ -61,35 +84,40 @@ export class KoiFarmElement extends HTMLElementBase {
         if (language)
             source.searchParams.set("lang", language);
 
-        if (pond !== null)
-            source.searchParams.set("resume", pond);
-
         if (storageKey)
             source.searchParams.set("storage", storageKey);
 
-        if (!this.hasAttribute("social"))
-            source.searchParams.set("social", "0");
+        this.configureSource(source);
 
         return source.href;
     }
 
     /**
-     * Render or refresh the embedded game.
+     * Emit a component lifecycle event.
+     * @param {String} name Event name without a component prefix
+     * @param {Object} detail Public event details
+     */
+    dispatchLifecycle(name, detail) {
+        this.dispatchEvent(new CustomEvent(`${this.eventPrefix}:${name}`, {
+            bubbles: true,
+            detail: detail
+        }));
+    }
+
+    /**
+     * Render or refresh the component runtime.
      */
     render() {
         const frame = document.createElement("iframe");
 
         frame.src = this.makeSource();
-        frame.title = this.getAttribute("title") || "Koi Farm";
+        frame.title = this.getAttribute("title") || this.defaultTitle;
         frame.loading = this.getAttribute("loading") || "eager";
         frame.allow = "autoplay; clipboard-write; fullscreen";
         frame.setAttribute("allowfullscreen", "");
         frame.setAttribute("part", "frame");
         frame.addEventListener("load", () => {
-            this.dispatchEvent(new CustomEvent("koi-farm:load", {
-                bubbles: true,
-                detail: {source: frame.src}
-            }));
+            this.dispatchLifecycle("load", {source: frame.src});
         });
 
         if (this.frame)
@@ -105,26 +133,19 @@ export class KoiFarmElement extends HTMLElementBase {
      * @param {Number} pond Pond index from 0 through 2
      */
     openPond(pond) {
-        const index = Number(pond);
+        const index = getPondIndex(pond, -1);
 
-        if (!Number.isInteger(index) || index < 0 || index > 2)
+        if (index === -1)
             throw new RangeError("pond must be an integer from 0 through 2");
 
-        this.setAttribute("pond", index.toString());
-    }
-
-    /**
-     * Return to the pond chooser.
-     */
-    openMenu() {
-        if (this.hasAttribute("pond"))
-            this.removeAttribute("pond");
-        else
+        if (this.getAttribute("pond") === index.toString())
             this.reload();
+        else
+            this.setAttribute("pond", index.toString());
     }
 
     /**
-     * Reload the current game URL.
+     * Reload the current runtime URL.
      */
     reload() {
         if (this.frame)
@@ -134,7 +155,7 @@ export class KoiFarmElement extends HTMLElementBase {
     }
 
     /**
-     * Forward trusted lifecycle messages from this element's game frame.
+     * Forward trusted lifecycle messages from this element's runtime frame.
      * @param {MessageEvent} event Browser message event
      */
     onMessage(event) {
@@ -146,36 +167,111 @@ export class KoiFarmElement extends HTMLElementBase {
         if (!message || message.source !== "koi-farm" || typeof message.type !== "string")
             return;
 
-        this.dispatchEvent(new CustomEvent(message.type, {
-            bubbles: true,
-            detail: message
-        }));
+        this.dispatchLifecycle(message.type.split(":").pop(), message);
     }
 }
 
 /**
- * Register the Koi Farm custom element once.
- * @returns {typeof KoiFarmElement}
+ * A live Koi world without save-slot, settings, card, or tutorial UI.
+ *
+ * Listen for `koi-world:load`, `koi-world:ready`, and `koi-world:session`.
  */
-export const defineKoiFarmElement = () => {
-    if (!globalThis.customElements)
-        return KoiFarmElement;
+export class KoiWorldElement extends KoiFrameElement {
+    get eventPrefix() {
+        return "koi-world";
+    }
 
-    if (!customElements.get("koi-farm"))
-        customElements.define("koi-farm", KoiFarmElement);
+    get defaultTitle() {
+        return "Koi world";
+    }
 
-    return KoiFarmElement;
+    configureSource(source) {
+        source.searchParams.set("mode", "world");
+        source.searchParams.set("pond", getPondIndex(this.getAttribute("pond")).toString());
+        source.searchParams.set("social", "0");
+        source.searchParams.delete("resume");
+    }
+}
+
+/**
+ * The complete Koi save-slot and menu system.
+ *
+ * Listen for `koi-system:load`, `koi-system:ready`, and `koi-system:session`.
+ */
+export class KoiSystemElement extends KoiFrameElement {
+    get eventPrefix() {
+        return "koi-system";
+    }
+
+    get defaultTitle() {
+        return "Koi system";
+    }
+
+    configureSource(source) {
+        const pond = this.getAttribute("pond");
+
+        source.searchParams.delete("mode");
+        source.searchParams.delete("pond");
+
+        if (pond === null)
+            source.searchParams.delete("resume");
+        else
+            source.searchParams.set("resume", getPondIndex(pond).toString());
+
+        if (!this.hasAttribute("social"))
+            source.searchParams.set("social", "0");
+    }
+
+    /**
+     * Return to the save-slot chooser.
+     */
+    openMenu() {
+        if (this.hasAttribute("pond"))
+            this.removeAttribute("pond");
+        else
+            this.reload();
+    }
+}
+
+/**
+ * Backward-compatible alias for the complete Koi system.
+ */
+export class KoiFarmElement extends KoiSystemElement {
+    get eventPrefix() {
+        return "koi-farm";
+    }
+
+    get defaultTitle() {
+        return "Koi Farm";
+    }
+}
+
+const defineElement = (name, ElementClass) => {
+    if (globalThis.customElements && !customElements.get(name))
+        customElements.define(name, ElementClass);
+
+    return ElementClass;
+};
+
+export const defineKoiWorldElement = () => defineElement("koi-world", KoiWorldElement);
+export const defineKoiSystemElement = () => defineElement("koi-system", KoiSystemElement);
+export const defineKoiFarmElement = () => defineElement("koi-farm", KoiFarmElement);
+
+export const defineKoiElements = () => {
+    defineKoiWorldElement();
+    defineKoiSystemElement();
+    defineKoiFarmElement();
 };
 
 const installStyles = () => {
-    if (!globalThis.document || document.getElementById("koi-farm-element-styles"))
+    if (!globalThis.document || document.getElementById("koi-embed-element-styles"))
         return;
 
     const style = document.createElement("style");
 
-    style.id = "koi-farm-element-styles";
+    style.id = "koi-embed-element-styles";
     style.textContent = `
-        :where(.koi-farm-element) {
+        :where(.koi-embed-element) {
             display: block;
             width: 100%;
             min-width: 0;
@@ -186,7 +282,7 @@ const installStyles = () => {
             contain: layout paint;
         }
 
-        :where(.koi-farm-element > iframe) {
+        :where(.koi-embed-element > iframe) {
             display: block;
             width: 100%;
             height: 100%;
@@ -199,4 +295,4 @@ const installStyles = () => {
 };
 
 installStyles();
-defineKoiFarmElement();
+defineKoiElements();
