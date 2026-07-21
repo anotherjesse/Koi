@@ -22,7 +22,10 @@
             <button type="button" data-save-key="world-demo:courtyard">Courtyard</button>
         </div>
     </div>
-    <koi-world save-key="world-demo:garden" title="Standalone Koi world"></koi-world>
+    <div class="world-stage">
+        <koi-world id="demo-world" save-key="world-demo:garden" title="Standalone Koi world"></koi-world>
+        <koi-world-controls for="demo-world"></koi-world-controls>
+    </div>
 </main>
 <script type="module">
     import "./koi-farm.js";

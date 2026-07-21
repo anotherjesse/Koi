@@ -242,16 +242,68 @@ if (gl &&
 
             if (event.source !== window.parent ||
                 !message ||
-                message.source !== "koi-component" ||
-                message.type !== "koi-farm:save")
+                message.source !== "koi-component")
                 return;
 
-            if (koi)
-                save();
+            if (message.type === "koi-farm:save") {
+                if (koi)
+                    save();
 
-            notifyHost("koi-farm:saved", {
-                requestId: message.requestId,
-                saveKey: activeSaveKey
+                notifyHost("koi-farm:saved", {
+                    requestId: message.requestId,
+                    saveKey: activeSaveKey
+                });
+
+                return;
+            }
+
+            if (message.type !== "koi-farm:control" || !koi)
+                return;
+
+            let value = message.value;
+
+            switch (message.control) {
+                case "weather":
+                    if (typeof value !== "string")
+                        return;
+
+                    try {
+                        koi.setWeather(value);
+                    }
+                    catch (error) {
+                        return;
+                    }
+
+                    break;
+                case "volume":
+                    if (typeof value !== "number" || !Number.isFinite(value))
+                        return;
+
+                    value = Math.max(0, Math.min(1, value));
+                    audioEngine.setMasterVolume(value);
+
+                    break;
+                case "grassAudio":
+                    if (typeof value !== "boolean")
+                        return;
+
+                    audioEngine.granular = value;
+
+                    break;
+                case "flashes":
+                    if (typeof value !== "boolean")
+                        return;
+
+                    settings.flash = value;
+
+                    break;
+                default:
+                    return;
+            }
+
+            notifyHost("koi-farm:control", {
+                control: message.control,
+                value: value
             });
         });
 

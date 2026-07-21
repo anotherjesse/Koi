@@ -127,66 +127,84 @@ WeatherState.prototype.timeToTransition = function() {
 };
 
 /**
+ * Change to a specific weather state.
+ * @param {Number} state The new weather state ID
+ * @param {AudioBank} audio Game audio
+ * @param {Random} random A randomizer
+ * @returns {Boolean} Whether the state changed
+ */
+WeatherState.prototype.setState = function(state, audio, random) {
+    if (!Number.isInteger(state) || state < this.ID_SUNNY || state > this.ID_THUNDERSTORM)
+        throw new RangeError("Invalid weather state");
+
+    const statePrevious = this.state;
+
+    this.time = 0;
+
+    if (statePrevious === state)
+        return false;
+
+    this.lastState = statePrevious;
+    this.state = state;
+
+    switch (statePrevious) {
+        case this.ID_DRIZZLE:
+        case this.ID_RAIN:
+            if (!renderSnow)
+                audio.ambientRainLight.stop();
+
+            break;
+        case this.ID_THUNDERSTORM:
+            this.cricketsIndex = Math.floor(random.getFloat() * this.CRICKET_COUNT);
+            this.timeCrickets = this.CRICKET_TIME;
+
+            audio.ambientCrickets[this.cricketsIndex].play();
+
+            if (!renderSnow)
+                audio.ambientRainHeavy.stop();
+
+            break;
+    }
+
+    switch (this.state) {
+        case this.ID_DRIZZLE:
+        case this.ID_RAIN:
+            if (!renderSnow)
+                audio.ambientRainLight.play();
+
+            break;
+        case this.ID_THUNDERSTORM:
+            if (!renderSnow)
+                audio.ambientRainHeavy.play();
+
+            break;
+    }
+
+    return true;
+};
+
+/**
  * Go to a new weather state
  * @param {AudioBank} audio Game audio
  * @param {Random} random A randomizer
  * @returns {Boolean} A boolean indicating whether the state changed
  */
 WeatherState.prototype.transition = function(audio, random) {
-    const statePrevious = this.state;
     const randomValue = random.getFloat();
     let chanceSum = 0;
+    let nextState = this.state;
 
     for (let next = 0, nextCount = this.TRANSITION_MATRIX[this.state].length; next < nextCount; ++next) {
         chanceSum += this.TRANSITION_MATRIX[this.state][next];
 
         if (randomValue < chanceSum) {
-            this.state = next;
+            nextState = next;
 
             break;
         }
     }
 
-    if (statePrevious !== this.state) {
-        this.lastState = statePrevious;
-
-        switch (statePrevious) {
-            case this.ID_DRIZZLE:
-            case this.ID_RAIN:
-                if (!renderSnow)
-                    audio.ambientRainLight.stop();
-
-                break;
-            case this.ID_THUNDERSTORM:
-                this.cricketsIndex = Math.floor(random.getFloat() * this.CRICKET_COUNT);
-                this.timeCrickets = this.CRICKET_TIME;
-
-                audio.ambientCrickets[this.cricketsIndex].play();
-
-                if (!renderSnow)
-                    audio.ambientRainHeavy.stop();
-
-                break;
-        }
-
-        switch (this.state) {
-            case this.ID_DRIZZLE:
-            case this.ID_RAIN:
-                if (!renderSnow)
-                    audio.ambientRainLight.play();
-
-                break;
-            case this.ID_THUNDERSTORM:
-                if (!renderSnow)
-                    audio.ambientRainHeavy.play();
-
-                break;
-        }
-
-        return true;
-    }
-
-    return false;
+    return this.setState(nextState, audio, random);
 };
 
 /**
@@ -216,9 +234,10 @@ WeatherState.prototype.initialize = function(audio) {
  * Update the weather state
  * @param {AudioBank} audio Game audio
  * @param {Random} random A randomizer
+ * @param {Boolean} [allowTransition] Whether automatic weather changes are enabled
  * @returns {Boolean} True if the state has changed
  */
-WeatherState.prototype.update = function(audio, random) {
+WeatherState.prototype.update = function(audio, random, allowTransition = true) {
     if (!this.initialized) {
         this.initialize(audio);
 
@@ -235,7 +254,8 @@ WeatherState.prototype.update = function(audio, random) {
     if (++this.time === this.STATE_TIME) {
         this.time = 0;
 
-        return this.transition(audio, random);
+        if (allowTransition)
+            return this.transition(audio, random);
     }
 
     if (--this.timeOneShot === 0) {

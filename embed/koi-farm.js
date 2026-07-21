@@ -1,5 +1,16 @@
+import {
+    KoiWorldControlsElement,
+    defineKoiWorldControlsElement
+} from "./koi-world-controls.js";
+
+export {
+    KoiWorldControlsElement,
+    defineKoiWorldControlsElement
+};
+
 const HTMLElementBase = globalThis.HTMLElement || class {};
 const DEFAULT_WORLD_SAVE_KEY = "koi-world";
+const WORLD_WEATHER_PRESETS = ["auto", "sunny", "overcast", "drizzle", "rain", "thunderstorm"];
 
 const getPondIndex = (value, fallback = 0) => {
     if (value === null || value === "")
@@ -207,6 +218,12 @@ export class KoiWorldElement extends KoiFrameElement {
         return [...super.observedAttributes, "save-key"];
     }
 
+    constructor() {
+        super();
+
+        this.controlValues = new Map();
+    }
+
     get eventPrefix() {
         return "koi-world";
     }
@@ -259,6 +276,77 @@ export class KoiWorldElement extends KoiFrameElement {
             this.reload();
         else
             this.saveKey = saveKey;
+    }
+
+    postControl(control, value) {
+        this.controlValues.set(control, value);
+
+        if (!this.gameWindow)
+            return false;
+
+        this.gameWindow.postMessage({
+            source: "koi-component",
+            type: "koi-farm:control",
+            control: control,
+            value: value
+        }, "*");
+
+        return true;
+    }
+
+    onMessage(event) {
+        super.onMessage(event);
+
+        if (!this.frame || event.source !== this.frame.contentWindow)
+            return;
+
+        const message = event.data;
+
+        if (!message || message.source !== "koi-farm" || message.type !== "koi-farm:session")
+            return;
+
+        for (const [control, value] of this.controlValues)
+            this.postControl(control, value);
+    }
+
+    getControl(control) {
+        return this.controlValues.get(control);
+    }
+
+    /**
+     * Use automatic weather or lock the world to a weather preset.
+     * @param {String} weather Weather preset name
+     */
+    setWeather(weather) {
+        if (!WORLD_WEATHER_PRESETS.includes(weather))
+            throw new RangeError(`weather must be one of: ${WORLD_WEATHER_PRESETS.join(", ")}`);
+
+        this.postControl("weather", weather);
+    }
+
+    /**
+     * Set the runtime's master volume.
+     * @param {Number} volume Volume in the range [0, 1]
+     */
+    setVolume(volume) {
+        if (typeof volume !== "number" || !Number.isFinite(volume) || volume < 0 || volume > 1)
+            throw new RangeError("volume must be a finite number from 0 through 1");
+
+        this.postControl("volume", volume);
+    }
+
+    setGrassAudio(enabled) {
+        if (typeof enabled !== "boolean")
+            throw new TypeError("enabled must be a boolean");
+
+        this.postControl("grassAudio", enabled);
+    }
+
+    setFlashes(enabled) {
+        if (typeof enabled !== "boolean")
+            throw new TypeError("enabled must be a boolean");
+
+        this.postControl("flashes", enabled);
     }
 }
 
@@ -357,6 +445,7 @@ export const defineKoiElements = () => {
     defineKoiWorldElement();
     defineKoiSystemElement();
     defineKoiFarmElement();
+    defineKoiWorldControlsElement();
 };
 
 const installStyles = () => {

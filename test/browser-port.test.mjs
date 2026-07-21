@@ -20,18 +20,23 @@ test("the browser entry point has no Electron bridge", async () => {
     assert.match(main, /canPlayType\('audio\/ogg/);
 });
 
-test("the package exposes the embeddable web component", async () => {
+test("the package exposes the embeddable web components", async () => {
     const packageJson = JSON.parse(await read("package.json"));
-    const component = await read("embed/koi-farm.js");
+    const [component, controls] = await Promise.all([
+        read("embed/koi-farm.js"),
+        read("embed/koi-world-controls.js")
+    ]);
 
     assert.equal(packageJson.exports["."], "./embed/koi-farm.js");
     assert.equal(packageJson.exports["./world"], "./embed/koi-farm.js");
+    assert.equal(packageJson.exports["./controls"], "./embed/koi-world-controls.js");
     assert.equal(packageJson.exports["./system"], "./embed/koi-farm.js");
     assert.match(component, /class KoiWorldElement/);
     assert.match(component, /class KoiSystemElement/);
     assert.match(component, /class KoiFarmElement/);
     assert.match(component, /defineElement\("koi-world"/);
     assert.match(component, /defineElement\("koi-system"/);
+    assert.match(controls, /customElements\.define\("koi-world-controls"/);
 
     const worldElement = component.slice(
         component.indexOf("export class KoiWorldElement"),
@@ -74,7 +79,31 @@ test("world mode bypasses the system UI and automatically starts a named save", 
     assert.match(style, /\.koi-world-mode #gui/);
     assert.match(style, /visibility: hidden/);
     assert.match(demo, /<koi-world/);
+    assert.match(demo, /<koi-world-controls for="demo-world"/);
     assert.match(demo, /save-key="world-demo:garden"/);
     assert.doesNotMatch(demo, /pond=/);
     assert.doesNotMatch(demo, /<koi-farm/);
+});
+
+test("world controls expose existing runtime weather and accessibility settings", async () => {
+    const [main, koi, weather, weatherState, component, controls] = await Promise.all([
+        read("js/main.js"),
+        read("js/koi/koi.js"),
+        read("js/koi/weather/weather.js"),
+        read("js/koi/weather/weatherState.js"),
+        read("embed/koi-farm.js"),
+        read("embed/koi-world-controls.js")
+    ]);
+
+    assert.match(component, /setWeather\(weather\)/);
+    assert.match(component, /setVolume\(volume\)/);
+    assert.match(component, /setGrassAudio\(enabled\)/);
+    assert.match(component, /setFlashes\(enabled\)/);
+    assert.match(controls, /Automatic/);
+    assert.match(controls, /Thunderstorm/);
+    assert.match(main, /message\.type !== "koi-farm:control"/);
+    assert.match(main, /notifyHost\("koi-farm:control"/);
+    assert.match(koi, /Koi\.prototype\.setWeather/);
+    assert.match(weather, /setControlledState/);
+    assert.match(weatherState, /allowTransition/);
 });

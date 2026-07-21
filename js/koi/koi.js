@@ -75,6 +75,13 @@ Koi.prototype.TOUCH_GRASS_RADIUS = 1;
 Koi.prototype.TOUCH_GRASS_INTENSITY = .7;
 Koi.prototype.TOUCH_GRASS_VOLUME = .4;
 Koi.prototype.AUTOSAVE_FREQUENCY = 2520;
+Koi.prototype.WEATHER_PRESETS = {
+    sunny: WeatherState.prototype.ID_SUNNY,
+    overcast: WeatherState.prototype.ID_OVERCAST,
+    drizzle: WeatherState.prototype.ID_DRIZZLE,
+    rain: WeatherState.prototype.ID_RAIN,
+    thunderstorm: WeatherState.prototype.ID_THUNDERSTORM
+};
 
 /**
  * Serialize the koi
@@ -407,14 +414,39 @@ Koi.prototype.resize = function() {
         this.systems.atlas);
 
     const weatherState = this.weather.state;
+    const weatherAutomatic = this.weather.automatic;
 
     this.freeRenderables();
     this.createRenderables();
 
     this.weather.setState(weatherState);
+    this.weather.automatic = weatherAutomatic;
     this.weatherFilterChanged = true;
 
     this.foreground.bugs.initialize(this.weather.state, this.effectsRandom);
+};
+
+/**
+ * Enable automatic weather or lock the world to a named weather preset.
+ * @param {String} preset A supported weather preset or "auto"
+ */
+Koi.prototype.setWeather = function(preset) {
+    if (preset === "auto") {
+        this.weather.setControlledState(null, this.audio, this.effectsRandom);
+
+        return;
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(this.WEATHER_PRESETS, preset))
+        throw new RangeError("Invalid weather preset");
+
+    if (this.weather.setControlledState(
+        this.WEATHER_PRESETS[preset],
+        this.audio,
+        this.effectsRandom)) {
+        this.weatherFilterChanged = true;
+        this.foreground.bugs.initialize(this.weather.state, this.effectsRandom);
+    }
 };
 
 /**

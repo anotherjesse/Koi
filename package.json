@@ -10,6 +10,7 @@
     ".": "./embed/koi-farm.js",
     "./embed": "./embed/koi-farm.js",
     "./world": "./embed/koi-farm.js",
+    "./controls": "./embed/koi-world-controls.js",
     "./system": "./embed/koi-farm.js",
     "./package.json": "./package.json"
   },

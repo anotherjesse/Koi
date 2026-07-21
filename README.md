@@ -50,6 +50,15 @@ Add the complete system separately when a project needs it:
 <koi-system src="/koi/index.html" storage-key="my-site"></koi-system>
 ```
 
+An optional controls component can target a world by ID. It is separate from the renderer, so applications can omit it or build their own UI with the same methods:
+
+```html
+<koi-world id="garden" save-key="garden"></koi-world>
+<koi-world-controls for="garden"></koi-world-controls>
+```
+
+The controls expose automatic weather plus `sunny`, `overcast`, `drizzle`, `rain`, and `thunderstorm` presets, along with volume, grass sounds, and lightning flashes. The weather presets use the simulation's existing weather, wind, precipitation, ambient color, insect, and audio behavior. Koi Farm does not currently simulate time of day, so there is no day/night control.
+
 Each component fills its available width with a 3:2 aspect ratio. `<koi-world>` accepts an opaque `save-key`, so applications can create any number of independently saved worlds without exposing the system's slot model:
 
 ```html
@@ -66,9 +75,9 @@ The exact key is used for save and load in browser storage. If omitted, it defau
 - `social`: show the Discord link in `<koi-system>`; it is hidden by default and is always omitted from `<koi-world>`.
 - `loading`: set the iframe loading mode to `eager` or `lazy`.
 
-The components emit prefixed lifecycle events: `koi-world:load`, `koi-world:ready`, `koi-world:session`, and `koi-world:saved` for the world; `koi-system:*` for the complete system. A world exposes `saveKey`, `load(saveKey)`, `save()`, and `reload()`. Switching keys saves the current world before loading the next one. The system exposes `openPond(index)`, `openMenu()`, and `reload()`.
+The components emit prefixed lifecycle events: `koi-world:load`, `koi-world:ready`, `koi-world:session`, `koi-world:saved`, and `koi-world:control` for the world; `koi-system:*` for the complete system. A world exposes `saveKey`, `load(saveKey)`, `save()`, `reload()`, `setWeather(preset)`, `setVolume(level)`, `setGrassAudio(enabled)`, and `setFlashes(enabled)`. Switching keys saves the current world before loading the next one. The system exposes `openPond(index)`, `openMenu()`, and `reload()`.
 
-When consuming the package from JavaScript, importing `koifarm` registers all three tags and exports `KoiWorldElement`, `KoiSystemElement`, `KoiFarmElement`, and their registration helpers.
+When consuming the package from JavaScript, importing `koifarm` registers all four tags and exports `KoiWorldElement`, `KoiWorldControlsElement`, `KoiSystemElement`, `KoiFarmElement`, and their registration helpers.
 
 ## Translations
 

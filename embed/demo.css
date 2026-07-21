@@ -88,6 +88,13 @@ koi-system {
     box-shadow: 0 24px 64px rgb(37 49 30 / 18%);
 }
 
+.world-stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 250px;
+    align-items: stretch;
+    gap: 16px;
+}
+
 @media (max-width: 700px) {
     header {
         display: block;
@@ -100,5 +107,9 @@ koi-system {
     .world-toolbar {
         align-items: start;
         flex-direction: column;
+    }
+
+    .world-stage {
+        grid-template-columns: 1fr;
     }
 }

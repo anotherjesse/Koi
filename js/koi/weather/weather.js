@@ -16,6 +16,7 @@ const Weather = function(gl, constellation, random) {
     this.lightning = this.lightningPrevious = 0;
     this.thunderTime = 0;
     this.thunderVolume = 0;
+    this.automatic = true;
 
     this.applyState(this.state.state);
 };
@@ -72,6 +73,30 @@ Weather.prototype.setState = function(state) {
  */
 Weather.prototype.getState = function() {
     return this.state;
+};
+
+/**
+ * Enable automatic weather or lock the simulation to a specific state.
+ * @param {Number|null} state A weather state ID, or null for automatic weather
+ * @param {AudioBank} audio Game audio
+ * @param {Random} random A randomizer
+ * @returns {Boolean} Whether the visible weather state changed
+ */
+Weather.prototype.setControlledState = function(state, audio, random) {
+    if (state === null) {
+        this.automatic = true;
+
+        return false;
+    }
+
+    this.automatic = false;
+
+    if (!this.state.setState(state, audio, random))
+        return false;
+
+    this.applyState(state);
+
+    return true;
 };
 
 /**
@@ -181,7 +206,7 @@ Weather.prototype.canThunder = function() {
  * @param {Random} random A randomizer
  */
 Weather.prototype.update = function(air, water, audio, plantMap, random) {
-    if (this.state.update(audio, random))
+    if (this.state.update(audio, random, this.automatic))
         this.applyState(this.state.state);
 
     this.transitionPrevious = this.transition;
