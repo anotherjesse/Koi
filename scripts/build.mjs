@@ -16,6 +16,8 @@ const browserFiles = [
     "favicon.ico",
     "index.html",
     "manifest.json",
+    "meta.json",
+    "thumb.jpg",
     "winter.css"
 ];
 
